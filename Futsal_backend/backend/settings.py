@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,13 +22,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-mp#e&7xayl47d1&z7v7ighsyjh#a*7pn48k22wr73t*!&a6g=^'
+SECRET_KEY = 'django-insecure-1wm-%t)5)sqat#)@ok#(14u70ja(xj=*2uq1elc)f)2t^&g0sw'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-AUTH_USER_MODEL = 'futsalapp.CustomUser'
-
 
 ALLOWED_HOSTS = []
 
@@ -41,8 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework.authtoken',  # for token auth if needed later
-    'futsalapp',
+    'rest_framework_simplejwt',
+    'accounts',
+    'teams',
+    'matches',
+    'bookings',
+    'payments',
+    'venues',
 ]
 
 MIDDLEWARE = [
@@ -104,6 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = 'accounts.CustomUser'
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -126,3 +131,14 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+#media handling
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
