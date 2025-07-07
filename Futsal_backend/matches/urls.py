@@ -1,14 +1,15 @@
+
+
 from django.urls import path
 from .views import (
-    MatchListCreateView,
-    MatchResponseView,
-    MatchResultCreateView,
-    MatchResultDetailView,
+    TeamListCreateView, VenueListCreateView, MatchCreateView, 
+    MatchListView, MatchConfirmView, BookingCreateView
 )
-
 urlpatterns = [
-    path('', MatchListCreateView.as_view(), name='match-list-create'),
-    path('<int:pk>/respond/', MatchResponseView.as_view(), name='match-respond'),
-    path('results/', MatchResultCreateView.as_view(), name='match-result-create'),
-    path('results/<int:match_id>/', MatchResultDetailView.as_view(), name='match-result-detail'),
+    path('teams/', TeamListCreateView.as_view(), name='team-list-create'),
+    path('venues/', VenueListCreateView.as_view(), name='venue-list-create'),
+    path('create/', MatchCreateView.as_view(), name='match-create'),
+    path('list/', MatchListView.as_view(), name='match-list'),
+    path('<int:pk>/confirm/', MatchConfirmView.as_view(), name='match-confirm'),
+    path('bookings/', BookingCreateView.as_view(), name='booking-create'),
 ]

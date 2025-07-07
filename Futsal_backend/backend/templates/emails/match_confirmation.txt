@@ -1,0 +1,9 @@
+Hello {{ team.manager.username }},
+
+Your match against {{ opponent_team.name }} has been confirmed!
+Venue: {{ match.venue.name }}
+Date: {{ match.date }} at {{ match.time }}
+
+Payment is due after the match (cash or eSewa).
+
+- HamroFutsal Team
