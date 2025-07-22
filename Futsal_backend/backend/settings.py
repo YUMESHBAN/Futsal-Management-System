@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'core.apps.CoreConfig',
     'corsheaders',  # Add this line
+    'futsal_app',
 ]
 
 MIDDLEWARE = [
