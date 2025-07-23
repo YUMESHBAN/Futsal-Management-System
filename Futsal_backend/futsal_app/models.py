@@ -19,6 +19,12 @@ class Futsal(models.Model):
 class Team(models.Model):
     name = models.CharField(max_length=100)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='teams')
+    created_by = models.ForeignKey(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    null=True,  # temporarily allow null
+    blank=True  # allow blank in forms
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
