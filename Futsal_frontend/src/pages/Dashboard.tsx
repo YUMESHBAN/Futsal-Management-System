@@ -26,49 +26,94 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const handleCreateFutsal = () => {
-    navigate("/create-futsal");
-  };
-
-  const handleViewMyFutsal = () => {
-    navigate("/my-futsal");
-  };
-
   if (loading)
     return <div className="text-center mt-20 text-gray-500">Loading...</div>;
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-6 rounded-lg shadow w-96 text-center">
-        <h2 className="text-2xl font-bold mb-4">Welcome, {username}!</h2>
-        <p className="mb-4 text-gray-700">
-          You are logged in as <strong>{userType}</strong>.
-        </p>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow p-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
+        <div className="flex items-center space-x-4">
+          <span className="text-gray-600 hidden sm:block">
+            Welcome, <strong>{username}</strong>!
+          </span>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600"
+          >
+            Logout
+          </button>
+        </div>
+      </header>
 
-        {userType === "owner" && (
-          <div className="space-y-2 mb-4">
-            <button
-              onClick={handleCreateFutsal}
-              className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              Create Futsal
-            </button>
-            <button
-              onClick={handleViewMyFutsal}
-              className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              View My Futsals
-            </button>
-          </div>
-        )}
+      {/* Main Content */}
+      <main className="flex flex-1 justify-center items-center px-4">
+        <div className="bg-white shadow rounded-lg p-6 w-full max-w-md text-center space-y-4">
+          <p className="text-gray-700 text-lg">
+            Logged in as <strong>{userType}</strong>
+          </p>
 
-        <button
-          onClick={handleLogout}
-          className="w-full bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-        >
-          Logout
-        </button>
-      </div>
+          {/* Owner Dashboard */}
+          {userType === "owner" ? (
+            <>
+              <button
+                onClick={() => navigate("/create-futsal")}
+                className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                Create Futsal
+              </button>
+              <button
+                onClick={() => navigate("/my-futsal")}
+                className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                View My Futsals
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded shadow">
+                <h2 className="text-2xl font-bold text-center mb-6">
+                  Player Dashboard
+                </h2>
+                <div className="space-y-4">
+                  {/* Player Dashboard */}
+                  <button
+                    onClick={() => navigate("/all-futsals")}
+                    className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                  >
+                    View All Futsals
+                  </button>
+                  <button
+                    onClick={() => navigate("/create-team")}
+                    className="w-full bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
+                  >
+                    Create My Team
+                  </button>
+                  <button
+                    onClick={() => navigate("/my-team")}
+                    className="w-full bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
+                  >
+                    View My Team
+                  </button>
+                  <button
+                    onClick={() => navigate("/invite-team")}
+                    className="w-full bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  >
+                    Invite Team for Match
+                  </button>
+                  <button
+                    onClick={() => navigate("/matches")}
+                    className="w-full bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"
+                  >
+                    View My Matches
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

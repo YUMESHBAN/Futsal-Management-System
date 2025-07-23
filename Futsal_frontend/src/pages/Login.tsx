@@ -31,7 +31,7 @@ export default function Login() {
   };
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gray-100">
+    <div className="h-screen flex flex-col items-center justify-center bg-gray-100 space-y-4">
       <form
         onSubmit={handleLogin}
         className="bg-white p-6 rounded-lg shadow w-96"
@@ -61,11 +61,23 @@ export default function Login() {
         >
           Login
         </button>
+      </form>
 
-        <button className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">
+      <div className="flex flex-col space-y-2 w-96">
+        <button
+          onClick={() => navigate("/register")}
+          className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600"
+        >
           Register Here!!!
         </button>
-      </form>
+
+        <button
+          onClick={() => navigate("/")}
+          className="text-blue-600 hover:underline"
+        >
+          &larr; Back to Home
+        </button>
+      </div>
     </div>
   );
 }

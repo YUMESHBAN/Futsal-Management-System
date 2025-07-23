@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function Register() {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState(""); // if you use email
   const [password, setPassword] = useState("");
   const [userType, setUserType] = useState("player");
   const [error, setError] = useState("");
@@ -13,23 +14,21 @@ export default function Register() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post(`${API_BASE_URL}/register/`, {
+      await axios.post(`${API_BASE_URL}/register/`, {
         username,
+        email, // remove if you don't need email
         password,
         user_type: userType,
       });
 
-      const { token, user_type } = response.data;
-
-      localStorage.setItem("token", token);
-      localStorage.setItem("user_type", user_type);
-
-      navigate("/dashboard");
+      // Redirect to login page after successful registration
+      navigate("/login");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       if (err.response && err.response.data) {
         const errorText =
           err.response.data.username?.[0] ||
+          err.response.data.email?.[0] ||
           err.response.data.password?.[0] ||
           err.response.data.user_type?.[0] ||
           err.response.data.non_field_errors?.[0] ||
@@ -42,7 +41,7 @@ export default function Register() {
   };
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gray-100">
+    <div className="h-screen flex flex-col items-center justify-center bg-gray-100 space-y-6">
       <form
         onSubmit={handleRegister}
         className="bg-white p-6 rounded-lg shadow w-96"
@@ -58,6 +57,16 @@ export default function Register() {
           className="w-full mb-3 p-2 border rounded"
           required
         />
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full mb-3 p-2 border rounded"
+          required
+        />
+
         <input
           type="password"
           placeholder="Password"
@@ -66,6 +75,7 @@ export default function Register() {
           className="w-full mb-3 p-2 border rounded"
           required
         />
+
         <select
           value={userType}
           onChange={(e) => setUserType(e.target.value)}
@@ -82,6 +92,13 @@ export default function Register() {
           Register
         </button>
       </form>
+
+      <button
+        onClick={() => navigate("/")}
+        className="text-blue-600 hover:underline"
+      >
+        &larr; Back to Home
+      </button>
     </div>
   );
 }
