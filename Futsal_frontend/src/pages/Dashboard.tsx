@@ -65,9 +65,28 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => navigate("/my-futsal")}
-                className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
               >
                 View My Futsals
+              </button>
+              <button
+                onClick={() => navigate("/generate-slots")}
+                className="w-full bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+              >
+                Generate Time Slots
+              </button>
+              <button
+                onClick={() => navigate("/manage-slots")}
+                className="w-full bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
+              >
+                Manage Time Slots
+              </button>
+
+              <button
+                onClick={() => navigate("/time-slots")}
+                className="w-full bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700"
+              >
+                View All Time Slots
               </button>
             </>
           ) : (
@@ -102,9 +121,10 @@ export default function Dashboard() {
                   >
                     Invite Team for Match
                   </button>
+
                   <button
                     onClick={() => navigate("/matches")}
-                    className="w-full bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"
+                    className="w-full bg-orange-700 text-white px-4 py-2 rounded hover:bg-gray-800"
                   >
                     View My Matches
                   </button>

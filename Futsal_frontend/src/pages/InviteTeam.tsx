@@ -7,118 +7,173 @@ interface Team {
   name: string;
 }
 
+interface Futsal {
+  id: number;
+  name: string;
+}
+
+interface TimeSlot {
+  id: number;
+  futsal_name: string;
+  start_time: string;
+  end_time: string;
+}
+
 export default function InviteTeam() {
-  const [otherTeams, setOtherTeams] = useState<Team[]>([]);
-  const [myTeamId, setMyTeamId] = useState<number | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [myTeam, setMyTeam] = useState<Team | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [futsals, setFutsals] = useState<Futsal[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
+  const [selectedFutsal, setSelectedFutsal] = useState<number | null>(null);
+  const [slots, setSlots] = useState<TimeSlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [matchType, setMatchType] = useState("friendly");
-  const [scheduledTime, setScheduledTime] = useState("");
-  const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+    if (!token) return;
 
-    // Get current user's team
     axios
       .get("http://127.0.0.1:8000/api/my-team/", {
         headers: { Authorization: `Token ${token}` },
       })
-      .then((res) => setMyTeamId(res.data.id))
-      .catch(() => setError("Please create your team first."));
+      .then((res) => setMyTeam(res.data));
 
-    // Get other teams
     axios
       .get("http://127.0.0.1:8000/api/other-teams/", {
         headers: { Authorization: `Token ${token}` },
       })
-      .then((res) => setOtherTeams(res.data))
-      .catch(() => setError("Failed to load other teams."));
-  }, [navigate, token]);
+      .then((res) => setTeams(res.data));
 
-  const handleInvite = () => {
-    if (!myTeamId || !selectedTeamId || !scheduledTime) {
-      setError("Please fill all fields.");
+    axios
+      .get("http://127.0.0.1:8000/api/futsals/", {
+        headers: { Authorization: `Token ${token}` },
+      })
+      .then((res) => setFutsals(res.data));
+  }, [token]);
+
+  // fetch slots when futsal is selected
+  useEffect(() => {
+    if (!selectedFutsal || !token) return;
+
+    axios
+      .get(`http://127.0.0.1:8000/api/time-slots/?futsal=${selectedFutsal}`, {
+        headers: { Authorization: `Token ${token}` },
+      })
+      .then((res) => setSlots(res.data))
+      .catch(() => setSlots([]));
+  }, [selectedFutsal, token]);
+
+  const handleSubmit = async () => {
+    if (!myTeam || !selectedTeam || !selectedSlot) {
+      setError("All fields are required");
       return;
     }
 
-    axios
-      .post(
+    const selectedSlotObj = slots.find((s) => s.id === selectedSlot);
+    if (!selectedSlotObj) {
+      setError("Invalid time slot selected");
+      return;
+    }
+
+    try {
+      await axios.post(
         "http://127.0.0.1:8000/api/team-matches/",
         {
-          team_1: myTeamId,
-          team_2: selectedTeamId,
+          team_1: myTeam.id,
+          team_2: selectedTeam,
           match_type: matchType,
-          scheduled_time: scheduledTime,
+          scheduled_time: selectedSlotObj.start_time,
+          time_slot: selectedSlot, // send slot ID
         },
         {
           headers: { Authorization: `Token ${token}` },
         }
-      )
-      .then(() => {
-        setSuccess("Match invitation sent successfully!");
-        setError("");
-        setSelectedTeamId(null);
-        setScheduledTime("");
-      })
-      .catch(() => setError("Failed to send invitation."));
+      );
+
+      navigate("/matches");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error(err.response?.data);
+      setError("Failed to send invitation");
+    }
   };
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 bg-white p-6 rounded shadow">
-      <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">
-        Invite a Team for Match
-      </h2>
+    <div className="max-w-2xl mx-auto mt-10 p-6 bg-white shadow rounded">
+      <h1 className="text-2xl font-bold mb-4">Invite a Team</h1>
 
-      {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-      {success && <p className="text-green-600 text-center mb-4">{success}</p>}
+      {error && <div className="text-red-500 mb-4">{error}</div>}
 
-      <div className="mb-4">
-        <label className="block mb-1 font-medium">Select Opponent Team</label>
-        <select
-          value={selectedTeamId ?? ""}
-          onChange={(e) => setSelectedTeamId(Number(e.target.value))}
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">-- Choose a team --</option>
-          {otherTeams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <label className="block mb-2 font-medium">Select Opponent Team:</label>
+      <select
+        value={selectedTeam ?? ""}
+        onChange={(e) => setSelectedTeam(parseInt(e.target.value))}
+        className="w-full mb-4 border p-2 rounded"
+      >
+        <option value="" disabled>
+          Select a team
+        </option>
+        {teams.map((team) => (
+          <option key={team.id} value={team.id}>
+            {team.name}
+          </option>
+        ))}
+      </select>
 
-      <div className="mb-4">
-        <label className="block mb-1 font-medium">Match Type</label>
-        <select
-          value={matchType}
-          onChange={(e) => setMatchType(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="friendly">Friendly</option>
-          <option value="competitive">Competitive</option>
-        </select>
-      </div>
+      <label className="block mb-2 font-medium">Select Futsal Venue:</label>
+      <select
+        value={selectedFutsal ?? ""}
+        onChange={(e) => {
+          setSelectedFutsal(parseInt(e.target.value));
+          setSelectedSlot(null); // reset slot
+        }}
+        className="w-full mb-4 border p-2 rounded"
+      >
+        <option value="" disabled>
+          Select futsal
+        </option>
+        {futsals.map((futsal) => (
+          <option key={futsal.id} value={futsal.id}>
+            {futsal.name}
+          </option>
+        ))}
+      </select>
 
-      <div className="mb-6">
-        <label className="block mb-1 font-medium">Scheduled Date & Time</label>
-        <input
-          type="datetime-local"
-          value={scheduledTime}
-          onChange={(e) => setScheduledTime(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
-      </div>
+      <label className="block mb-2 font-medium">Select Time Slot:</label>
+      <select
+        value={selectedSlot ?? ""}
+        onChange={(e) => setSelectedSlot(parseInt(e.target.value))}
+        className="w-full mb-4 border p-2 rounded"
+        disabled={!slots.length}
+      >
+        <option value="" disabled>
+          {slots.length === 0 ? "No available slots" : "Select time slot"}
+        </option>
+        {slots.map((slot) => (
+          <option key={slot.id} value={slot.id}>
+            {new Date(slot.start_time).toLocaleString()} -{" "}
+            {new Date(slot.end_time).toLocaleTimeString()} @ {slot.futsal_name}
+          </option>
+        ))}
+      </select>
+
+      <label className="block mb-2 font-medium">Match Type:</label>
+      <select
+        value={matchType}
+        onChange={(e) => setMatchType(e.target.value)}
+        className="w-full mb-4 border p-2 rounded"
+      >
+        <option value="friendly">Friendly</option>
+        <option value="competitive">Competitive</option>
+      </select>
 
       <button
-        onClick={handleInvite}
-        className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        onClick={handleSubmit}
+        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700"
       >
         Send Invitation
       </button>

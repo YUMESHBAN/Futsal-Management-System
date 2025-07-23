@@ -1,6 +1,8 @@
 from django.db import models
 from core.models import CustomUser
 from django.conf import settings
+from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class Futsal(models.Model):
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, limit_choices_to={'user_type': 'owner'})
@@ -35,6 +37,8 @@ class Player(models.Model):
     
 
 
+
+
 class TeamMatch(models.Model):
     MATCH_TYPES = [
         ('friendly', 'Friendly'),
@@ -52,9 +56,16 @@ class TeamMatch(models.Model):
     team_2 = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='received_matches')
     match_type = models.CharField(max_length=20, choices=MATCH_TYPES)
     scheduled_time = models.DateTimeField()
-    accepted = models.BooleanField(null=True)  # None = Pending, True = Accepted, False = Rejected
+    accepted = models.BooleanField(null=True)  # None = Pending
     result = models.CharField(max_length=20, choices=RESULT_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    time_slot = models.ForeignKey('TimeSlot', on_delete=models.SET_NULL, null=True, blank=True, related_name='matches')
+
+    def clean(self):
+        if self.match_type == 'friendly' and not self.time_slot:
+            raise ValidationError("Friendly matches require a time slot.")
+        if self.time_slot and self.time_slot.is_booked:
+            raise ValidationError("This time slot is already booked.")
 
     def __str__(self):
         status = (
@@ -63,3 +74,16 @@ class TeamMatch(models.Model):
             "Pending"
         )
         return f"{self.team_1.name} vs {self.team_2.name} ({self.match_type}) [{status}]"
+
+
+class TimeSlot(models.Model):
+    futsal = models.ForeignKey('Futsal', on_delete=models.CASCADE, related_name='time_slots')
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    is_booked = models.BooleanField(default=False)
+    booked_by_match = models.ForeignKey('TeamMatch', null=True, blank=True, on_delete=models.SET_NULL, related_name='booked_slot')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.futsal.name} | {self.start_time.strftime('%Y-%m-%d %H:%M')} - {self.end_time.strftime('%H:%M')} ({'Booked' if self.is_booked else 'Available'})"

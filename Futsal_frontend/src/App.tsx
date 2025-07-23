@@ -19,6 +19,10 @@ import AllFutsals from "./pages/AllFutsals";
 
 import InviteTeam from "./pages/InviteTeam";
 import MatchHistory from "./pages/MatchHistory";
+import TimeSlotBooking from "./pages/TimeSlotBooking";
+import ManageSlots from "./pages/ManageSlots";
+import AutoSlotGenerator from "./pages/AutoSlotGenerator";
+import ViewTimeSlots from "./pages/ViewTimeSlots";
 
 export default function App() {
   return (
@@ -44,6 +48,11 @@ export default function App() {
 
         <Route path="/invite-team" element={<InviteTeam />} />
         <Route path="/matches" element={<MatchHistory />} />
+
+        <Route path="/book-slot" element={<TimeSlotBooking />} />
+        <Route path="/manage-slots" element={<ManageSlots />} />
+        <Route path="/generate-slots" element={<AutoSlotGenerator />} />
+        <Route path="/time-slots" element={<ViewTimeSlots />} />
       </Routes>
     </Router>
   );

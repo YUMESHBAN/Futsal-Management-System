@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Futsal,Player,TeamMatch,Team
+from .models import Futsal,Player,TeamMatch,Team,TimeSlot
 
 # ---- Futsal Serializer ----
 class FutsalSerializer(serializers.ModelSerializer):
@@ -7,6 +7,14 @@ class FutsalSerializer(serializers.ModelSerializer):
         model = Futsal
         fields = '__all__'
         read_only_fields = ['owner']
+
+class TimeSlotSerializer(serializers.ModelSerializer):
+    futsal_name = serializers.CharField(source='futsal.name', read_only=True)
+
+    class Meta:
+        model = TimeSlot
+        fields = ['id', 'futsal', 'futsal_name', 'start_time', 'end_time', 'is_booked', 'booked_by_match', 'created_at']
+        read_only_fields = ['is_booked', 'booked_by_match', 'created_at']
 
 
 # ---- Player Serializer ----
@@ -36,13 +44,41 @@ class TeamSerializer(serializers.ModelSerializer):
 class TeamMatchSerializer(serializers.ModelSerializer):
     team_1_name = serializers.CharField(source='team_1.name', read_only=True)
     team_2_name = serializers.CharField(source='team_2.name', read_only=True)
+    time_slot = serializers.PrimaryKeyRelatedField(queryset=TimeSlot.objects.filter(is_booked=False), required=False)
 
     class Meta:
         model = TeamMatch
         fields = [
-            'id', 'team_1','team_2',
-            'team_1_name','team_2_name',
+            'id', 'team_1', 'team_2',
+            'team_1_name', 'team_2_name',
             'match_type', 'scheduled_time',
-            'accepted', 'result', 'created_at'
+            'accepted', 'result', 'created_at',
+            'time_slot',
         ]
-        read_only_fields = ['accepted', 'result', 'created_at']
+        read_only_fields = ['id', 'accepted', 'result', 'created_at']
+
+    def validate(self, data):
+        time_slot = data.get('time_slot')
+        if data['match_type'] == 'friendly':
+            if not time_slot:
+                raise serializers.ValidationError("Friendly matches require a time slot.")
+            if time_slot.is_booked:
+                raise serializers.ValidationError("Selected time slot is already booked.")
+        return data
+    
+    def create(self, validated_data):
+        time_slot = validated_data.get('time_slot')
+
+        # Optional: validate booking before saving
+        if time_slot:
+            if time_slot.is_booked:
+                raise serializers.ValidationError("This time slot is already booked.")
+
+        match = TeamMatch.objects.create(**validated_data)
+
+        if time_slot:
+            time_slot.is_booked = True
+            time_slot.booked_by_match = match
+            time_slot.save()
+
+        return match
