@@ -19,6 +19,7 @@ export default function ManageSlots() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const token = localStorage.getItem("token");
 
   const fetchSlots = async () => {
@@ -35,21 +36,16 @@ export default function ManageSlots() {
 
   const groupSlotsByDate = (slots: TimeSlot[]) => {
     const grouped: GroupedSlots = {};
-
     slots.forEach((slot) => {
       const date = new Date(slot.start_time).toLocaleDateString();
-      if (!grouped[date]) {
-        grouped[date] = [];
-      }
+      if (!grouped[date]) grouped[date] = [];
       grouped[date].push(slot);
     });
 
-    // Sort dates in ascending order
     const sortedDates = Object.keys(grouped).sort(
       (a, b) => new Date(a).getTime() - new Date(b).getTime()
     );
 
-    // Create new sorted object
     const sortedGrouped: GroupedSlots = {};
     sortedDates.forEach((date) => {
       sortedGrouped[date] = grouped[date];
@@ -77,6 +73,7 @@ export default function ManageSlots() {
       setStartTime("");
       setEndTime("");
       setError("");
+      setMessage("Slot created successfully.");
       fetchSlots();
     } catch (err) {
       setError("Failed to create time slot");
@@ -85,12 +82,27 @@ export default function ManageSlots() {
 
   const deleteSlot = async (id: number) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/time-slots/${id}/`, {
+      await axios.delete(`http://127.0.0.1:8000/api/time-slots/${id}/delete/`, {
         headers: { Authorization: `Token ${token}` },
       });
+      setMessage("Slot deleted successfully.");
       fetchSlots();
     } catch (err) {
       setError("Failed to delete time slot");
+    }
+  };
+
+  const terminateBooking = async (id: number) => {
+    try {
+      await axios.post(
+        `http://127.0.0.1:8000/api/time-slots/${id}/terminate/`,
+        {},
+        { headers: { Authorization: `Token ${token}` } }
+      );
+      setMessage("Booking terminated successfully.");
+      fetchSlots();
+    } catch (err) {
+      setError("Failed to terminate booking");
     }
   };
 
@@ -132,6 +144,7 @@ export default function ManageSlots() {
           Create
         </button>
         {error && <p className="text-red-500 mt-2">{error}</p>}
+        {message && <p className="text-green-600 mt-2">{message}</p>}
       </div>
 
       {/* Time Slot List */}
@@ -180,14 +193,24 @@ export default function ManageSlots() {
                         {slot.is_booked ? "Booked" : "Available"}
                       </span>
                     </div>
-                    {!slot.is_booked && (
-                      <button
-                        onClick={() => deleteSlot(slot.id)}
-                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
-                      >
-                        Delete
-                      </button>
-                    )}
+
+                    <div className="space-x-2">
+                      {!slot.is_booked ? (
+                        <button
+                          onClick={() => deleteSlot(slot.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => terminateBooking(slot.id)}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition"
+                        >
+                          Terminate
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

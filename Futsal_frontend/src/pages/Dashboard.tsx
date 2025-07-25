@@ -88,6 +88,12 @@ export default function Dashboard() {
               >
                 View All Time Slots
               </button>
+              <button
+                onClick={() => navigate("/match-results")}
+                className="w-full bg-pink-600 text-white px-4 py-2 rounded hover:bg-cyan-700"
+              >
+                Enter Match Results
+              </button>
             </>
           ) : (
             <>

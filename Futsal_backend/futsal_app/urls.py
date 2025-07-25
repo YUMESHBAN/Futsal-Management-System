@@ -48,5 +48,5 @@ urlpatterns = [
     path('team-matches/', TeamMatchListCreateView.as_view(), name='team-match-list-create'),
     path('team-matches/<int:match_id>/accept/', AcceptMatchView.as_view(), name='accept-match'),
     path('team-matches/<int:match_id>/reject/', RejectMatchView.as_view(), name='reject-match'),
-    path('team-matches/<int:match_id>/set-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
+    path('team-matches/<int:match_id>/update-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
 ]

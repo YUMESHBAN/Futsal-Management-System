@@ -66,6 +66,10 @@ class TeamMatch(models.Model):
     result = models.CharField(max_length=20, choices=RESULT_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     time_slot = models.ForeignKey('TimeSlot', on_delete=models.SET_NULL, null=True, blank=True, related_name='matches')
+    team_1_score = models.IntegerField(null=True, blank=True)
+    team_2_score = models.IntegerField(null=True, blank=True)
+    result_updated = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
         if self.match_type == 'friendly' and not self.time_slot:

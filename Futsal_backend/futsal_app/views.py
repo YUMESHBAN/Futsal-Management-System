@@ -215,10 +215,22 @@ class TeamMatchListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return TeamMatch.objects.filter(
-            models.Q(team_1__owner=user) | models.Q(team_2__owner=user)
-        ).order_by('-created_at')  # Show both sent and received matches
 
+        # Matches where user is team owner (either side)
+        team_matches = TeamMatch.objects.filter(
+            models.Q(team_1__owner=user) | models.Q(team_2__owner=user)
+        )
+
+        # Matches where user owns the futsal (via time_slot)
+        futsal_matches = TeamMatch.objects.filter(
+            time_slot__futsal__owner=user
+        )
+
+        # Union both sets and remove duplicates
+        queryset = team_matches.union(futsal_matches).order_by('-created_at')
+
+        return queryset
+    
     def perform_create(self, serializer):
         team_1 = serializer.validated_data['team_1']
         
@@ -268,24 +280,42 @@ class RejectMatchView(APIView):
         return Response({"detail": "Match rejected."})
 
 
+# futsal_app/views.py
+
 class UpdateMatchResultView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, match_id):
         match = get_object_or_404(TeamMatch, id=match_id)
-        result = request.data.get('result')
+        user = request.user
 
-        if match.team_1.owner != request.user and match.team_2.owner != request.user:
-            return Response({"detail": "Not authorized to update match result."}, status=403)
+        if not match.time_slot or match.time_slot.futsal.owner != user:
+            return Response({"detail": "Only the venue owner can update the result."}, status=403)
 
-        if result not in ['team_1', 'team_2', 'draw']:
-            return Response({"detail": "Invalid result value."}, status=400)
+        try:
+            team_1_score = int(request.data.get("team_1_score"))
+            team_2_score = int(request.data.get("team_2_score"))
+        except (TypeError, ValueError):
+            return Response({"detail": "Both scores must be integers."}, status=400)
 
+        # Set the result
+        if team_1_score > team_2_score:
+            result = "team_1"
+        elif team_2_score > team_1_score:
+            result = "team_2"
+        else:
+            result = "draw"
+
+        # Save the result
+        match.team_1_score = team_1_score
+        match.team_2_score = team_2_score
         match.result = result
+        match.result_updated = True
         match.save()
-        return Response({"detail": f"Match result set to {result}."})
-    
 
+        return Response({
+            "detail": f"Result updated successfully: {match.team_1.name} {team_1_score} - {team_2_score} {match.team_2.name} ({result})."
+        })
 
 # -------------------------------
 # Player Views
