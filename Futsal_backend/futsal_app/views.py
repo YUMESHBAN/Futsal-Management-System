@@ -8,7 +8,11 @@ from rest_framework.exceptions import PermissionDenied
 from django.db import models
 from rest_framework.generics import ListAPIView
 from datetime import datetime, timedelta
-
+from utils.email_service import (
+    notify_futsal_owner_on_booking,
+    notify_sender_on_booking_confirmed,
+    notify_sender_on_match_rejected
+)
 
 from .models import Futsal, Team, Player, TeamMatch,TimeSlot
 from .serializers import (
@@ -263,6 +267,10 @@ class AcceptMatchView(APIView):
 
         match.accepted = True
         match.save()
+        if match.match_type == "friendly":
+            notify_futsal_owner_on_booking(match)
+            notify_sender_on_booking_confirmed(match)
+
         return Response({"detail": "Match accepted."})
 
 
@@ -277,6 +285,9 @@ class RejectMatchView(APIView):
 
         match.accepted = False
         match.save()
+
+        notify_sender_on_match_rejected(match)
+        
         return Response({"detail": "Match rejected."})
 
 
