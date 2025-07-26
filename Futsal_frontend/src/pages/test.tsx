@@ -6,13 +6,12 @@ interface TimeSlot {
   start_time: string;
   end_time: string;
   is_booked: boolean;
-  futsal: number;
   futsal_name: string;
+  futsal: number;
   team_name?: string;
   user_email?: string;
   match_result?: string;
 }
-
 interface Match {
   id: number;
   team_1: number;
@@ -27,6 +26,10 @@ interface Match {
   time_slot: number;
 }
 
+interface GroupedMatches {
+  [date: string]: Match[];
+}
+
 interface GroupedSlots {
   [date: string]: TimeSlot[];
 }
@@ -34,6 +37,7 @@ interface GroupedSlots {
 export default function ManageSlots() {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [groupedMatches, setGroupedMatches] = useState<GroupedMatches>({});
   const [groupedSlots, setGroupedSlots] = useState<GroupedSlots>({});
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -50,17 +54,6 @@ export default function ManageSlots() {
       groupSlotsByDate(res.data);
     } catch (err) {
       setError("Failed to load time slots");
-    }
-  };
-
-  const fetchMatches = async () => {
-    try {
-      const res = await axios.get("http://127.0.0.1:8000/api/team-matches/", {
-        headers: { Authorization: `Token ${token}` },
-      });
-      setMatches(res.data);
-    } catch (err) {
-      console.error("Failed to fetch matches");
     }
   };
 
@@ -86,7 +79,6 @@ export default function ManageSlots() {
 
   useEffect(() => {
     fetchSlots();
-    fetchMatches();
   }, []);
 
   const createSlot = async () => {
@@ -138,7 +130,6 @@ export default function ManageSlots() {
   return (
     <div className="max-w-3xl mx-auto mt-10">
       <h2 className="text-2xl font-bold mb-6">Manage Time Slots</h2>
-
       {/* Create Form */}
       <div className="bg-white p-4 rounded shadow mb-6">
         <h3 className="text-xl font-semibold mb-2">Create New Slot</h3>
@@ -175,7 +166,6 @@ export default function ManageSlots() {
         {error && <p className="text-red-500 mt-2">{error}</p>}
         {message && <p className="text-green-600 mt-2">{message}</p>}
       </div>
-
       {/* Time Slot List */}
       <div>
         <h3 className="text-xl font-semibold mb-2">Existing Slots</h3>
@@ -195,9 +185,11 @@ export default function ManageSlots() {
               </h4>
               <ul className="space-y-3">
                 {slots.map((slot) => {
-                  const match = matches.find((m) => m.time_slot === slot.id);
+                  <p className="text-sm text-gray-600 mt-1">
+                    {slot.futsal_name}
+                  </p>;
                   const isCompleted =
-                    match && match.result && match.result !== "pending";
+                    slot.match_result && slot.match_result !== "pending";
 
                   return (
                     <div
@@ -247,26 +239,30 @@ export default function ManageSlots() {
                       <div className="flex space-x-2 items-center mt-3">
                         {slot.is_booked ? (
                           <>
-                            {match?.result === "pending" ? (
-                              <button
-                                onClick={() => terminateBooking(slot.id)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors"
-                              >
-                                Cancel Booking
-                              </button>
+                            {slot.match_result === "pending" ? (
+                              <>
+                                <button
+                                  onClick={() => terminateBooking(slot.id)}
+                                  className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1"
+                                >
+                                  Cancel Booking
+                                </button>
+                              </>
                             ) : (
-                              <button
-                                onClick={() => deleteSlot(slot.id)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                Finish Match
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => deleteSlot(slot.id)}
+                                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
+                                >
+                                  Finish Match
+                                </button>
+                              </>
                             )}
                           </>
                         ) : (
                           <button
                             onClick={() => deleteSlot(slot.id)}
-                            className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-1"
                           >
                             Delete Slot
                           </button>
@@ -285,17 +281,7 @@ export default function ManageSlots() {
                           </p>
                         </div>
                       )}
-
-                      {isCompleted && match && (
-                        <p className="text-sm text-green-700 mt-2">
-                          <strong>Status:</strong>{" "}
-                          {match.result === "team_1"
-                            ? `${match.team_1_name} won`
-                            : match.result === "team_2"
-                            ? `${match.team_2_name} won`
-                            : match.result}
-                        </p>
-                      )}
+                      {isCompleted && <div>Hello</div>}
                     </div>
                   );
                 })}

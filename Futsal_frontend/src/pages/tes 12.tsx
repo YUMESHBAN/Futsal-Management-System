@@ -7,24 +7,10 @@ interface TimeSlot {
   end_time: string;
   is_booked: boolean;
   futsal: number;
-  futsal_name: string;
   team_name?: string;
   user_email?: string;
-  match_result?: string;
-}
-
-interface Match {
-  id: number;
-  team_1: number;
-  team_2: number;
-  team_1_name: string;
-  team_2_name: string;
-  match_type: string;
-  scheduled_time: string;
-  accepted: boolean;
-  result: string;
-  created_at: string;
-  time_slot: number;
+  match_result?: string; // 'pending', 'completed', etc.
+  // match ID associated with the booking
 }
 
 interface GroupedSlots {
@@ -33,7 +19,6 @@ interface GroupedSlots {
 
 export default function ManageSlots() {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
   const [groupedSlots, setGroupedSlots] = useState<GroupedSlots>({});
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -50,17 +35,6 @@ export default function ManageSlots() {
       groupSlotsByDate(res.data);
     } catch (err) {
       setError("Failed to load time slots");
-    }
-  };
-
-  const fetchMatches = async () => {
-    try {
-      const res = await axios.get("http://127.0.0.1:8000/api/team-matches/", {
-        headers: { Authorization: `Token ${token}` },
-      });
-      setMatches(res.data);
-    } catch (err) {
-      console.error("Failed to fetch matches");
     }
   };
 
@@ -86,7 +60,6 @@ export default function ManageSlots() {
 
   useEffect(() => {
     fetchSlots();
-    fetchMatches();
   }, []);
 
   const createSlot = async () => {
@@ -135,10 +108,27 @@ export default function ManageSlots() {
     }
   };
 
+  const markMatchCompleted = async (matchId: number | undefined) => {
+    if (!matchId) {
+      setError("Invalid match ID");
+      return;
+    }
+    try {
+      await axios.patch(
+        `http://127.0.0.1:8000/api/team-matches/${matchId}/result/`,
+        { result: "completed" },
+        { headers: { Authorization: `Token ${token}` } }
+      );
+      setMessage("Match marked as completed.");
+      fetchSlots();
+    } catch (err) {
+      setError("Failed to mark match as completed.");
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto mt-10">
       <h2 className="text-2xl font-bold mb-6">Manage Time Slots</h2>
-
       {/* Create Form */}
       <div className="bg-white p-4 rounded shadow mb-6">
         <h3 className="text-xl font-semibold mb-2">Create New Slot</h3>
@@ -175,7 +165,6 @@ export default function ManageSlots() {
         {error && <p className="text-red-500 mt-2">{error}</p>}
         {message && <p className="text-green-600 mt-2">{message}</p>}
       </div>
-
       {/* Time Slot List */}
       <div>
         <h3 className="text-xl font-semibold mb-2">Existing Slots</h3>
@@ -195,9 +184,8 @@ export default function ManageSlots() {
               </h4>
               <ul className="space-y-3">
                 {slots.map((slot) => {
-                  const match = matches.find((m) => m.time_slot === slot.id);
                   const isCompleted =
-                    match && match.result && match.result !== "pending";
+                    slot.match_result && slot.match_result !== "pending";
 
                   return (
                     <div
@@ -244,39 +232,10 @@ export default function ManageSlots() {
                         </span>
                       </div>
 
-                      <div className="flex space-x-2 items-center mt-3">
-                        {slot.is_booked ? (
-                          <>
-                            {match?.result === "pending" ? (
-                              <button
-                                onClick={() => terminateBooking(slot.id)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors"
-                              >
-                                Cancel Booking
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => deleteSlot(slot.id)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                Finish Match
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => deleteSlot(slot.id)}
-                            className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                          >
-                            Delete Slot
-                          </button>
-                        )}
-                      </div>
-
                       {slot.is_booked && (
                         <div className="mt-3 pt-3 border-t border-gray-100">
                           <p className="text-sm text-gray-700">
-                            <span className="font-medium">Booked By:</span>{" "}
+                            <span className="font-medium">Team:</span>{" "}
                             {slot.team_name || "N/A"}
                           </p>
                           <p className="text-sm text-gray-600 mt-1">
@@ -284,17 +243,6 @@ export default function ManageSlots() {
                             {slot.user_email || "N/A"}
                           </p>
                         </div>
-                      )}
-
-                      {isCompleted && match && (
-                        <p className="text-sm text-green-700 mt-2">
-                          <strong>Status:</strong>{" "}
-                          {match.result === "team_1"
-                            ? `${match.team_1_name} won`
-                            : match.result === "team_2"
-                            ? `${match.team_2_name} won`
-                            : match.result}
-                        </p>
                       )}
                     </div>
                   );

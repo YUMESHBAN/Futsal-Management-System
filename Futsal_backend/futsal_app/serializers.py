@@ -12,18 +12,22 @@ class TimeSlotSerializer(serializers.ModelSerializer):
     futsal_name = serializers.CharField(source='futsal.name', read_only=True)
     team_name = serializers.SerializerMethodField()
     user_email = serializers.SerializerMethodField()
+    match_result = serializers.SerializerMethodField()
 
     class Meta:
         model = TimeSlot
         fields = [
-            "id",
-            "futsal",
-            "futsal_name",
-            "start_time",
-            "end_time",
-            "is_booked",
-            "team_name",
-            "user_email",
+            'id',
+            'futsal',
+            'futsal_name',
+            'start_time',
+            'end_time',
+            'is_booked',
+            'created_at',
+            'booked_by_match',
+            'team_name',
+            'user_email',
+            'match_result',
         ]
 
     def get_team_name(self, obj):
@@ -34,6 +38,11 @@ class TimeSlotSerializer(serializers.ModelSerializer):
     def get_user_email(self, obj):
         if obj.booked_by_match and obj.booked_by_match.team_1 and obj.booked_by_match.team_1.created_by:
             return obj.booked_by_match.team_1.created_by.email
+        return None
+
+    def get_match_result(self, obj):
+        if obj.booked_by_match:
+            return obj.booked_by_match.result
         return None
 
 # ---- Player Serializer ----

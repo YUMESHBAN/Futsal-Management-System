@@ -1,0 +1,19 @@
+Subject: Match Request: {{ team.name }} vs Your Team
+
+Hello {{ recipient.username }},
+
+You've received a match request from {{ team.name }}!
+
+Match Details:
+- Proposed Date: {{ match.scheduled_time|date:"F j, Y" }}
+- Proposed Time: {{ match.scheduled_time|time:"g:i A" }}
+{% if match.venue %}- Venue: {{ match.venue.name }}{% endif %}
+
+To respond to this request:
+- Accept: {{ accept_url }}
+- Decline: {{ reject_url }}
+
+Please respond within 48 hours.
+
+Thanks,
+The HamroFutsal Team
