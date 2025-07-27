@@ -23,7 +23,8 @@ from .views import (
     GenerateTimeSlotsView,
 
     esewa_success_callback,
-    esewa_failure_callback
+    esewa_failure_callback,
+    SendPaymentEmailView, ConfirmPaymentView,
 
 
 )
@@ -53,9 +54,12 @@ urlpatterns = [
     path('team-matches/', TeamMatchListCreateView.as_view(), name='team-match-list-create'),
     path('team-matches/<int:match_id>/accept/', AcceptMatchView.as_view(), name='accept-match'),
     path('team-matches/<int:match_id>/reject/', RejectMatchView.as_view(), name='reject-match'),
-    path('team-matches/<int:match_id>/update-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
+    
 
 
     path("api/payments/callback/success/", esewa_success_callback),
     path("api/payments/callback/failure/", esewa_failure_callback),
+    path('team-matches/<int:match_id>/send-payment-email/', SendPaymentEmailView.as_view(), name='send_payment_email'),
+    path('team-matches/<int:match_id>/confirm-payment/', ConfirmPaymentView.as_view(), name='confirm_payment'),
+    path('team-matches/<int:match_id>/update-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
 ]

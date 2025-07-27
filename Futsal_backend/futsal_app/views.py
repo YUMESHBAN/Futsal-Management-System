@@ -13,6 +13,7 @@ from django.http import HttpResponse
 
 
 
+
 from datetime import datetime, timedelta
 import uuid
 from utils.email_service import (
@@ -20,7 +21,8 @@ from utils.email_service import (
     notify_sender_on_booking_confirmed,
     notify_sender_on_match_rejected,
     notify_team_owners_match_result,
-    send_match_payment_email
+    send_match_payment_email,
+    send_match_invitation_email 
 )
 
 
@@ -471,3 +473,70 @@ from rest_framework.response import Response
 def esewa_failure_callback(request):
     # Handle eSewa failure callback logic here
     return Response({"detail": "Payment failed or cancelled."})
+
+
+class SendPaymentEmailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, match_id):
+        match = get_object_or_404(TeamMatch, id=match_id)
+
+        # Only futsal owner can send payment email
+        if not match.time_slot or match.time_slot.futsal.owner != request.user:
+            return Response({"detail": "Only the venue owner can send payment email."}, status=403)
+
+        # Compose eSewa payment URL (you can customize this as needed)
+        payment_url = f"https://rc-epay.esewa.com.np/api/epay/main/v2/form?pid=HAMRO-{match_id}&amt={match.time_slot.futsal.price_per_hour}&scd=EPAYTEST&su=http://your-success-url&fu=http://your-failure-url"
+
+        # Prepare list of player emails - assuming both teams' owners are paying players
+        to_emails = []
+        if match.team_1.owner.email:
+            to_emails.append(match.team_1.owner.email)
+        if match.team_2.owner.email:
+            to_emails.append(match.team_2.owner.email)
+
+        # Custom message with payment URL
+        subject = f'HamroFutsal - Payment Request for Match {match.team_1.name} vs {match.team_2.name}'
+        message = (
+            f"Dear Player,\n\n"
+            f"You have a payment request for your upcoming match:\n"
+            f"Teams: {match.team_1.name} vs {match.team_2.name}\n"
+            f"Scheduled Time: {match.scheduled_time}\n"
+            f"Venue: {match.time_slot.futsal.name}\n\n"
+            f"Please complete your payment via eSewa here:\n{payment_url}\n\n"
+            f"Thank you,\nHamroFutsal Team"
+        )
+
+        send_match_payment_email(to_emails, match)  # or send_mail(subject, message, ...) if you want to send this message
+
+        return Response({"detail": "Payment email sent to players."})
+    
+
+class ConfirmPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, match_id):
+        match = get_object_or_404(TeamMatch, id=match_id)
+
+        # Only futsal owner can confirm payment
+        if not match.time_slot or match.time_slot.futsal.owner != request.user:
+            return Response({"detail": "Only the venue owner can confirm payment."}, status=403)
+
+        # Create or update the payment record
+        payment, created = Payment.objects.get_or_create(
+            match=match,
+            defaults={
+                "amount": match.time_slot.futsal.price_per_hour,
+                "method": "eSewa",
+                "status": "paid",
+            },
+        )
+
+        if not created and payment.status == "paid":
+            return Response({"detail": "Payment is already marked as paid."})
+
+        # Mark payment as paid
+        payment.status = "paid"
+        payment.save()
+
+        return Response({"detail": "Payment marked as received."})

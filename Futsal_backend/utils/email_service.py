@@ -136,18 +136,17 @@ def notify_team_owners_match_result(match):
             fail_silently=False,
         )
 
-def send_match_payment_email(to_emails, match, payment):
-    subject = "HamroFutsal - eSewa Payment Request for Your Match"
-    esewa_link = payment.transaction_id and f"https://esewa.com.np/?amt={payment.amount}&pid={payment.transaction_id}&scd=EPAYTEST&su=http://localhost:8000/api/payments/callback/success/&fu=http://localhost:8000/api/payments/callback/failure/"
+def send_match_payment_email(to_emails, match):
+    subject = 'HamroFutsal - You have a pending payment...'
+
+    futsal_name = match.time_slot.futsal.name if match.time_slot else "N/A"
 
     message = (
         f"Hello,\n\n"
-        f"You have a pending payment for your upcoming match at {match.time_slot.futsal.name}.\n"
-        f"Match: {match.team_1.name} vs {match.team_2.name}\n"
-        f"Amount: NPR {payment.amount}\n"
-        f"Please pay via eSewa using the following link:\n\n{esewa_link}\n\n"
-        f"After payment, please notify the venue owner.\n\n"
-        f"Thank you for using HamroFutsal!"
+        f"You have payemnt due for {match.match_type} match.\n"
+        f"Completed Time: {match.scheduled_time}\n"
+        f"Venue: {futsal_name}\n\n"
+        f"Use this link for esewa payment  https://esewa.com.np/#/home "
     )
 
     send_mail(
@@ -157,3 +156,10 @@ def send_match_payment_email(to_emails, match, payment):
         to_emails,
         fail_silently=False,
     )
+
+
+
+
+
+
+    
