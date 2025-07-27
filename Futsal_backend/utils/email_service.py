@@ -98,3 +98,62 @@ def notify_sender_on_match_rejected(match):
         [inviting_owner_email],
         fail_silently=False,
     )
+
+def notify_team_owners_match_result(match):
+    if not match.result_updated:
+        return
+
+    result_text = {
+        'team_1': f"{match.team_1.name} won 🎉",
+        'team_2': f"{match.team_2.name} won 🎉",
+        'draw': "The match ended in a draw 🤝",
+        'pending': "Result is pending",
+    }.get(match.result, "Unknown")
+
+    subject = f'HamroFutsal - Match Result: {match.team_1.name} vs {match.team_2.name}'
+    message = (
+        f"Hi Team Owner,\n\n"
+        f"The result for your recent match has been submitted:\n\n"
+        f"Teams: {match.team_1.name} vs {match.team_2.name}\n"
+        f"Final Score: {match.team_1_score} - {match.team_2_score}\n"
+        f"Result: {result_text}\n"
+        f"Date & Time: {match.scheduled_time.strftime('%Y-%m-%d %H:%M')}\n"
+        f"Venue: {match.time_slot.futsal.name if match.time_slot else 'N/A'}\n\n"
+        f"Thanks for playing with HamroFutsal!"
+    )
+
+    to_emails = list({
+        match.team_1.owner.email,
+        match.team_2.owner.email,
+    })
+
+    if to_emails:
+        send_mail(
+            subject,
+            message,
+            settings.EMAIL_HOST_USER,
+            to_emails,
+            fail_silently=False,
+        )
+
+def send_match_payment_email(to_emails, match, payment):
+    subject = "HamroFutsal - eSewa Payment Request for Your Match"
+    esewa_link = payment.transaction_id and f"https://esewa.com.np/?amt={payment.amount}&pid={payment.transaction_id}&scd=EPAYTEST&su=http://localhost:8000/api/payments/callback/success/&fu=http://localhost:8000/api/payments/callback/failure/"
+
+    message = (
+        f"Hello,\n\n"
+        f"You have a pending payment for your upcoming match at {match.time_slot.futsal.name}.\n"
+        f"Match: {match.team_1.name} vs {match.team_2.name}\n"
+        f"Amount: NPR {payment.amount}\n"
+        f"Please pay via eSewa using the following link:\n\n{esewa_link}\n\n"
+        f"After payment, please notify the venue owner.\n\n"
+        f"Thank you for using HamroFutsal!"
+    )
+
+    send_mail(
+        subject,
+        message,
+        settings.EMAIL_HOST_USER,
+        to_emails,
+        fail_silently=False,
+    )

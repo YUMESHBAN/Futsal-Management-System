@@ -7,14 +7,24 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from django.db import models
 from rest_framework.generics import ListAPIView
+from rest_framework.decorators import api_view,permission_classes
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+
+
+
 from datetime import datetime, timedelta
+import uuid
 from utils.email_service import (
     notify_futsal_owner_on_booking,
     notify_sender_on_booking_confirmed,
-    notify_sender_on_match_rejected
+    notify_sender_on_match_rejected,
+    notify_team_owners_match_result,
+    send_match_payment_email
 )
 
-from .models import Futsal, Team, Player, TeamMatch,TimeSlot
+
+from .models import Futsal, Team, Player, TeamMatch,TimeSlot,Payment
 from .serializers import (
     FutsalSerializer,
     TeamSerializer,
@@ -219,21 +229,19 @@ class TeamMatchListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        include_all = self.request.query_params.get("include_all", "false").lower() == "true"
 
-        # Matches where user is team owner (either side)
-        team_matches = TeamMatch.objects.filter(
-            models.Q(team_1__owner=user) | models.Q(team_2__owner=user)
-        )
+        base_filter = models.Q(team_1__owner=user) | models.Q(team_2__owner=user)
+        futsal_filter = models.Q(time_slot__futsal__owner=user)
 
-        # Matches where user owns the futsal (via time_slot)
-        futsal_matches = TeamMatch.objects.filter(
-            time_slot__futsal__owner=user
-        )
+        if not include_all:
+            base_filter &= models.Q(result_updated=False)
+            futsal_filter &= models.Q(result_updated=False)
 
-        # Union both sets and remove duplicates
-        queryset = team_matches.union(futsal_matches).order_by('-created_at')
+        team_matches = TeamMatch.objects.filter(base_filter)
+        futsal_matches = TeamMatch.objects.filter(futsal_filter)
 
-        return queryset
+        return (team_matches | futsal_matches).distinct().order_by('-created_at')
     
     def perform_create(self, serializer):
         team_1 = serializer.validated_data['team_1']
@@ -291,7 +299,9 @@ class RejectMatchView(APIView):
         return Response({"detail": "Match rejected."})
 
 
-# futsal_app/views.py
+
+
+
 
 class UpdateMatchResultView(APIView):
     permission_classes = [IsAuthenticated]
@@ -300,16 +310,21 @@ class UpdateMatchResultView(APIView):
         match = get_object_or_404(TeamMatch, id=match_id)
         user = request.user
 
+        # Only futsal owner can submit result
         if not match.time_slot or match.time_slot.futsal.owner != user:
             return Response({"detail": "Only the venue owner can update the result."}, status=403)
 
         try:
             team_1_score = int(request.data.get("team_1_score"))
             team_2_score = int(request.data.get("team_2_score"))
+            payment_method = request.data.get("payment_method")
         except (TypeError, ValueError):
-            return Response({"detail": "Both scores must be integers."}, status=400)
+            return Response({"detail": "Invalid scores or missing payment method."}, status=400)
 
-        # Set the result
+        if payment_method not in ['Cash', 'eSewa']:
+            return Response({"detail": "Invalid payment method."}, status=400)
+
+        # Compute match result
         if team_1_score > team_2_score:
             result = "team_1"
         elif team_2_score > team_1_score:
@@ -317,16 +332,31 @@ class UpdateMatchResultView(APIView):
         else:
             result = "draw"
 
-        # Save the result
-        match.team_1_score = team_1_score
-        match.team_2_score = team_2_score
-        match.result = result
-        match.result_updated = True
-        match.save()
+        if payment_method == "Cash":
+            # Save match result
+            match.team_1_score = team_1_score
+            match.team_2_score = team_2_score
+            match.result = result
+            match.result_updated = True
+            match.save()
 
-        return Response({
-            "detail": f"Result updated successfully: {match.team_1.name} {team_1_score} - {team_2_score} {match.team_2.name} ({result})."
-        })
+            # Create or update payment record with status 'paid'
+            Payment.objects.update_or_create(
+                match=match,
+                defaults={
+                    "amount": match.time_slot.futsal.price_per_hour,
+                    "method": "Cash",
+                    "status": "paid",
+                }
+            )
+
+            # Notify both teams about the match result
+            notify_team_owners_match_result(match)
+
+            return Response({"detail": "Result and payment recorded successfully via HandCash."})
+
+        # For now, just return a clear message for eSewa option
+        return Response({"detail": "eSewa payment flow will be handled separately."}, status=200)
 
 # -------------------------------
 # Player Views
@@ -362,3 +392,82 @@ class PlayerListCreateView(generics.ListCreateAPIView):
         if Player.objects.filter(team=team).count() >= 8:
             raise ValidationError({"detail": "Maximum of 8 players allowed."})
         serializer.save(team=team)
+
+
+
+# -------------------------------
+# Payment Views
+# -------------------------------
+
+@api_view(['POST'])
+@csrf_exempt
+def esewa_success_callback(request):
+    pid = request.POST.get('pid')
+    try:
+        payment = Payment.objects.get(transaction_id=pid)
+        payment.status = 'paid'
+        payment.save()
+        return HttpResponse("Payment Successful")
+    except Payment.DoesNotExist:
+        return HttpResponse("Payment not found", status=404)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_payment_email(request, match_id):
+    match = get_object_or_404(TeamMatch, id=match_id)
+    user = request.user
+
+    if not match.time_slot or match.time_slot.futsal.owner != user:
+        return Response({"detail": "Only the venue owner can send payment emails."}, status=403)
+
+    payment = getattr(match, 'payment', None)
+    if not payment or payment.method != 'eSewa' or payment.status != 'pending':
+        return Response({"detail": "No pending eSewa payment found for this match."}, status=400)
+
+    # Collect emails of players from both teams (assumes teams have owners with emails)
+    to_emails = []
+    if match.team_1.owner.email:
+        to_emails.append(match.team_1.owner.email)
+    if match.team_2.owner.email:
+        to_emails.append(match.team_2.owner.email)
+
+    if not to_emails:
+        return Response({"detail": "No players found to send payment email."}, status=400)
+
+    # Call your email helper (you will create this)
+    send_match_payment_email(to_emails, match, payment)
+
+    return Response({"detail": "Payment email sent to players."})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def confirm_payment_received(request, match_id):
+    match = get_object_or_404(TeamMatch, id=match_id)
+    user = request.user
+
+    if not match.time_slot or match.time_slot.futsal.owner != user:
+        return Response({"detail": "Only the venue owner can confirm payment."}, status=403)
+
+    payment = getattr(match, 'payment', None)
+    if not payment or payment.status != 'pending':
+        return Response({"detail": "No pending payment to confirm."}, status=400)
+
+    # Mark payment as paid
+    payment.status = 'paid'
+    payment.save()
+
+    # Update match result now
+    match.result_updated = True
+    match.save()
+
+    # (Optional) send notification emails here
+
+    return Response({"detail": "Payment confirmed and match result updated."})
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+@api_view(['GET', 'POST'])
+def esewa_failure_callback(request):
+    # Handle eSewa failure callback logic here
+    return Response({"detail": "Payment failed or cancelled."})

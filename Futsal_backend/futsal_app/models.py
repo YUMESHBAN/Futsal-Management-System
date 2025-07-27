@@ -97,3 +97,23 @@ class TimeSlot(models.Model):
 
     def __str__(self):
         return f"{self.futsal.name} | {self.start_time.strftime('%Y-%m-%d %H:%M')} - {self.end_time.strftime('%H:%M')} ({'Booked' if self.is_booked else 'Available'})"
+    
+
+# Payment Model
+class Payment(models.Model):
+    PAYMENT_METHODS = [
+        ('Cash', 'Cash'),
+        ('eSewa', 'eSewa'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+    ]
+
+    match = models.OneToOneField(TeamMatch, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    method = models.CharField(max_length=10, choices=PAYMENT_METHODS)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    transaction_id = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
