@@ -154,17 +154,3 @@ REST_FRAMEWORK = {
     ]
 }
 
-
-# Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # For Gmail (or your SMTP provider)
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'hamrofutsal41@gmail.com'
-EMAIL_HOST_PASSWORD = 'fpky wlbc wkqz agwv'  # Use app password for Gmail
-
-# settings.py
-
-ESEWA_MERCHANT_ID = "EPAYTEST"
-ESEWA_SECRET_KEY = '8gBm/:&EnhH.1/q'
-ESEWA_URL = 'https://rc-epay.esewa.com.np/api/epay/main/v2/form'  # Test URL, change for production
