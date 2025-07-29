@@ -6,16 +6,16 @@ from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from django.db import models
+from django.db.models import Q
+from datetime import date
 from rest_framework.generics import ListAPIView
 from rest_framework.decorators import api_view,permission_classes
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
-
-
-
-
 from datetime import datetime, timedelta
 import uuid
+
+
 from utils.email_service import (
     notify_futsal_owner_on_booking,
     notify_sender_on_booking_confirmed,
@@ -26,14 +26,21 @@ from utils.email_service import (
 )
 
 
-from .models import Futsal, Team, Player, TeamMatch,TimeSlot,Payment
+from .models import Futsal, Team, Player, TeamMatch,TimeSlot,Payment,MatchRequest,Match
 from .serializers import (
     FutsalSerializer,
     TeamSerializer,
     TeamMatchSerializer,
     PlayerSerializer,
     TimeSlotSerializer,
+    MatchRequestSerializer
 )
+
+from futsal_app.Algorithms.elo import update_elo
+from futsal_app.Algorithms.collabfiltering import recommend_by_collab
+from futsal_app.Algorithms.contentbasedfiltering import recommend_by_content
+from futsal_app.Algorithms.hybrid import merge_recommendations
+
 
 # -------------------------------
 # Futsal Views
@@ -159,10 +166,19 @@ class TeamListCreateView(generics.ListCreateAPIView):
         return Team.objects.filter(owner=self.request.user)
 
     def perform_create(self, serializer):
+        # Check if user already has a team
         if Team.objects.filter(owner=self.request.user).exists():
             raise ValidationError({"detail": "You already have a team."})
-        serializer.save(owner=self.request.user)
 
+        # Validate minimum 5 futsals selected
+        preferred_futsals = self.request.data.get('preferred_futsal_ids') or []
+        if len(preferred_futsals) < 2:
+            raise ValidationError({"detail": "You must select at least 2 preferred futsals."})
+
+        team = serializer.save(owner=self.request.user)
+
+        # Assign preferred futsals to M2M
+        team.preferred_futsals.set(preferred_futsals)
 
 class MyTeamView(APIView):
     permission_classes = [IsAuthenticated]
@@ -334,31 +350,35 @@ class UpdateMatchResultView(APIView):
         else:
             result = "draw"
 
-        if payment_method == "Cash":
-            # Save match result
-            match.team_1_score = team_1_score
-            match.team_2_score = team_2_score
-            match.result = result
-            match.result_updated = True
-            match.save()
+        # Fetch or create payment
+        payment, _ = Payment.objects.get_or_create(
+            match=match,
+            defaults={
+                "amount": match.time_slot.futsal.price_per_hour,
+                "method": payment_method,
+                "status": "pending" if payment_method == "eSewa" else "paid"
+            }
+        )
 
-            # Create or update payment record with status 'paid'
-            Payment.objects.update_or_create(
-                match=match,
-                defaults={
-                    "amount": match.time_slot.futsal.price_per_hour,
-                    "method": "Cash",
-                    "status": "paid",
-                }
-            )
+        if payment_method == "eSewa" and payment.status != "paid":
+            return Response({"detail": "eSewa payment not confirmed yet."}, status=400)
 
-            # Notify both teams about the match result
-            notify_team_owners_match_result(match)
+        # Save result
+        match.team_1_score = team_1_score
+        match.team_2_score = team_2_score
+        match.result = result
+        match.result_updated = True
+        match.save()
 
-            return Response({"detail": "Result and payment recorded successfully via HandCash."})
+        # Ensure payment is updated
+        payment.method = payment_method
+        payment.status = "paid"
+        payment.save()
 
-        # For now, just return a clear message for eSewa option
-        return Response({"detail": "eSewa payment flow will be handled separately."}, status=200)
+        notify_team_owners_match_result(match)
+
+        return Response({"detail": "Result and payment recorded successfully."})
+
 
 # -------------------------------
 # Player Views
@@ -540,3 +560,355 @@ class ConfirmPaymentView(APIView):
         payment.save()
 
         return Response({"detail": "Payment marked as received."})
+    
+
+
+
+# -------------------------------
+# Competitive Matchmaking View
+# -------------------------------
+
+
+class RecommendedOpponentsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        my_team = Team.objects.filter(owner=request.user).first()
+        if not my_team:
+            return Response({"detail": "You don\'t have a team."}, status=404)
+
+        other_teams = Team.objects.exclude(id=my_team.id)
+        serializer = TeamSerializer(other_teams, many=True)
+        return Response(serializer.data)
+
+class SendMatchRequestView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, team_id):
+        my_team = Team.objects.filter(owner=request.user).first()
+        opponent_team = Team.objects.filter(id=team_id).first()
+
+        if not my_team or not opponent_team:
+            return Response({"detail": "Teams not found."}, status=404)
+
+        if my_team.id == opponent_team.id:
+            return Response({"detail": "You cannot send request to your own team."}, status=400)
+
+        MatchRequest.objects.create(team_1=my_team, team_2=opponent_team)
+        return Response({"detail": "Match request sent."}, status=201)
+
+class RespondMatchRequestView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, match_id):
+        action = request.data.get("action")  # "accept" or "reject"
+        match = MatchRequest.objects.filter(id=match_id).first()
+
+        if not match:
+            return Response({"detail": "Match not found."}, status=404)
+
+        if match.team_2.owner != request.user:
+            return Response({"detail": "You are not authorized to respond."}, status=403)
+
+        if action == "accept":
+            match.status = "confirmed"
+            match.save()
+            return Response({"detail": "Match accepted."})
+        elif action == "reject":
+            match.delete()
+            return Response({"detail": "Match rejected and deleted."})
+        return Response({"detail": "Invalid action."}, status=400)
+
+
+
+
+
+# ---------- Competitive Match Views ----------
+
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def recommend_competitive_match(request):
+    user_team = Team.objects.filter(owner=request.user).first()
+
+    if not user_team:
+        return Response({"error": "No team found."}, status=400)
+
+    cf = recommend_by_collab(user_team.id, top_n=10)
+    cb = recommend_by_content(user_team, top_n=10)
+    hybrid = merge_recommendations(cf, cb)
+
+    response = []
+    for team_id, score in hybrid:
+        try:
+            t = Team.objects.get(id=team_id)
+            response.append({
+                "team_id": t.id,
+                "team_name": t.name,
+                "elo_rating": t.ranking,
+                "win_rate": t.win_rate,
+                "weighted_score": t.weighted_score,
+                "preferred_futsals": [f.name for f in t.preferred_futsals.all()],
+                "similarity_score": round(score, 3)
+            })
+        except Team.DoesNotExist:
+            continue
+
+    return Response({
+        "your_team_id": user_team.id,
+        "recommendations": response
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def send_match_request(request, team_id):
+    sender = Team.objects.filter(owner=request.user).first()
+    if not sender:
+        return Response({"error": "You have no team."}, status=400)
+
+    try:
+        receiver = Team.objects.get(id=team_id)
+    except Team.DoesNotExist:
+        return Response({"error": "Opponent not found."}, status=404)
+
+    if Match.objects.filter(
+        Q(team_1=sender, team_2=receiver, is_completed=False) |
+        Q(team_1=receiver, team_2=sender, is_completed=False)
+    ).exists():
+        return Response({"error": "Existing match found."}, status=409)
+
+    match = Match.objects.create(
+    team_1=sender,
+    team_2=receiver,
+    match_type='competitive',
+    status='pending',
+    accepted=None  # Optional, but good for clarity
+)
+
+    return Response({"message": "Match request sent.", "match_id": match.id}, status=201)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_competitive_matches(request):
+    user_team = Team.objects.filter(owner=request.user).first()
+    if not user_team:
+        return Response({"error": "You are not part of any team."}, status=400)
+
+    matches = Match.objects.filter(
+        match_type='competitive'
+    ).filter(
+        Q(team_1=user_team) | Q(team_2=user_team)
+    ).order_by('-created_at')
+
+    data = []
+    for match in matches:
+        data.append({
+            "id": match.id,
+            "team_1": match.team_1.id,
+            "team_1_name": match.team_1.name,
+            "team_2": match.team_2.id,
+            "team_2_name": match.team_2.name,
+            "match_type": match.match_type,
+            "scheduled_time": match.scheduled_date,
+            "status": match.status,
+            "accepted": match.accepted,  # ✅ Add this
+            "created_at": match.created_at,
+            "futsal_name": match.futsal.name if match.futsal else None 
+        })
+
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def respond_to_match_request(request, match_id):
+    decision = request.data.get("decision")
+    if decision not in ['accept', 'reject']:
+        return Response({"error": "Invalid decision."}, status=400)
+
+    try:
+        match = Match.objects.get(id=match_id)
+    except Match.DoesNotExist:
+        return Response({"error": "Match not found."}, status=404)
+
+    if match.team_2.owner != request.user:
+        return Response({"error": "Unauthorized."}, status=403)
+
+    if decision == 'accept':
+        match.status = 'confirmed'
+        match.accepted = True  # ✅ Add this
+        match.save()
+        return Response({"message": "Accepted."})
+
+    # If rejected
+    match.accepted = False  # ✅ Add this
+    match.status = 'pending'  # Optional: or keep as 'pending'
+    match.save()
+    return Response({"message": "Rejected."})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def schedule_match(request, match_id):
+    date_str = request.data.get("scheduled_date")
+
+    # ✅ Validate date format
+    try:
+        date_obj = date.fromisoformat(date_str)
+    except ValueError:
+        return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
+    if date_obj < date.today():
+        return Response({"error": "Cannot schedule match in the past."}, status=400)
+
+    # ✅ Get match
+    try:
+        match = Match.objects.get(id=match_id)
+    except Match.DoesNotExist:
+        return Response({"error": "Match not found."}, status=404)
+
+    if match.status != 'confirmed':
+        return Response({"error": "Only confirmed matches can be scheduled."}, status=400)
+
+    # ✅ Get requesting user's team
+    team = Team.objects.filter(owner=request.user).first()
+    if not team:
+        return Response({"error": "Your user is not linked to any team."}, status=400)
+
+    if team not in [match.team_1, match.team_2]:
+        return Response({"error": "You are not a participant in this match."}, status=403)
+
+    # ✅ Determine opponent team
+    opponent_team = match.team_2 if team == match.team_1 else match.team_1
+
+    # ✅ Compare preferred futsals
+    preferred_futsals = set(team.preferred_futsals.values_list('id', flat=True))
+    opponent_futsals = set(opponent_team.preferred_futsals.values_list('id', flat=True))
+
+    common_futsals = preferred_futsals.intersection(opponent_futsals)
+
+    # ✅ Choose futsal
+    if common_futsals:
+        futsal_id = list(common_futsals)[0]
+        futsal = Futsal.objects.get(id=futsal_id)
+    else:
+        futsal = team.futsal
+        if not futsal:
+            return Response({"error": "Your team has no assigned futsal."}, status=400)
+
+    # ✅ Finalize scheduling
+    match.scheduled_date = date_obj
+    match.futsal = futsal
+    match.status = 'scheduled'
+    match.save()
+
+    return Response({
+        "message": "Match scheduled successfully.",
+        "match_id": match.id,
+        "date": date_str,
+        "futsal": futsal.name
+    }, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def owner_competitive_matches(request):
+    futsals = Futsal.objects.filter(owner=request.user)
+    matches = Match.objects.filter(
+        match_type='competitive',
+        futsal__in=futsals
+    ).order_by('-created_at')
+
+    data = []
+    for match in matches:
+        data.append({
+            "id": match.id,
+            "team_1": match.team_1.name,
+            "team_1_id": match.team_1.id,  # ✅ Include this
+            "team_2": match.team_2.name,
+            "team_2_id": match.team_2.id,  # ✅ Include this
+            "status": match.status,
+            "scheduled_date": match.scheduled_date,
+            "winner": match.winner.name if match.winner else None,
+            "futsal": match.futsal.name if match.futsal else None
+        })
+
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def finalize_match(request):
+    match_id = request.data.get('match_id')
+    winner_id = request.data.get('winner_id')
+    goals_team_1 = request.data.get('goals_team_1')
+    goals_team_2 = request.data.get('goals_team_2')
+
+    # Validate input
+    if not all([match_id, winner_id, goals_team_1 is not None, goals_team_2 is not None]):
+        return Response({'error': 'Missing required fields.'}, status=400)
+
+    try:
+        goals_team_1 = int(goals_team_1)
+        goals_team_2 = int(goals_team_2)
+    except ValueError:
+        return Response({'error': 'Goals must be integers.'}, status=400)
+
+    try:
+        match = Match.objects.get(id=match_id, match_type='competitive')
+    except Match.DoesNotExist:
+        return Response({'error': 'Match not found.'}, status=404)
+
+    if not match.futsal:
+        return Response({'error': 'Match has no assigned futsal venue.'}, status=400)
+
+    # Ensure the requesting user is the futsal owner
+    if match.futsal.owner != request.user:
+        return Response({'error': 'Only the futsal owner can finalize the match.'}, status=403)
+
+    try:
+        winner_team = Team.objects.get(id=winner_id)
+    except Team.DoesNotExist:
+        return Response({'error': 'Winner team not found.'}, status=404)
+
+    if winner_team not in [match.team_1, match.team_2]:
+        return Response({'error': 'Winner must be one of the participating teams.'}, status=400)
+
+    # Finalize match
+    match.winner = winner_team
+    match.status = 'completed'
+    match.is_completed = True
+    match.save()
+
+    # Call elo update with goals
+    result = update_elo(
+        team_a=match.team_1,
+        team_b=match.team_2,
+        winner_team=winner_team,
+        goals_a=goals_team_1,
+        goals_b=goals_team_2
+    )
+
+    return Response({
+        'message': 'Match finalized and ELO updated.',
+        'elo_result': result
+    }, status=200)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def competitive_leaderboard(request):
+    teams = Team.objects.all().order_by('-ranking')
+
+    data = [
+        {
+            'id': team.id,
+            'name': team.name,
+            'ranking': round(team.ranking, 2),
+            'owner_name': team.owner.username if team.owner else "N/A",
+        }
+        for team in teams
+    ]
+    return Response(data)

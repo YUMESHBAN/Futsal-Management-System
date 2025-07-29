@@ -1,4 +1,5 @@
 from django.urls import path
+from futsal_app import views
 from .views import (
     # Futsal & Time Slots
     FutsalListCreateView,
@@ -22,9 +23,17 @@ from .views import (
     UpdateMatchResultView,
     GenerateTimeSlotsView,
 
+    # Payment
     esewa_success_callback,
     esewa_failure_callback,
-    SendPaymentEmailView, ConfirmPaymentView,
+    SendPaymentEmailView, 
+    ConfirmPaymentView,
+
+
+    # Competitive
+    RecommendedOpponentsView,
+    SendMatchRequestView,
+    RespondMatchRequestView,
 
 
 )
@@ -62,4 +71,17 @@ urlpatterns = [
     path('team-matches/<int:match_id>/send-payment-email/', SendPaymentEmailView.as_view(), name='send_payment_email'),
     path('team-matches/<int:match_id>/confirm-payment/', ConfirmPaymentView.as_view(), name='confirm_payment'),
     path('team-matches/<int:match_id>/update-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
+
+
+    path('competitive/request/<int:team_id>/', views.send_match_request, name='send-competitive-request'),
+    path('competitive/respond/<int:match_id>/', views.respond_to_match_request, name='respond-competitive-request'),
+    path('competitive/finalize/', views.finalize_match, name='finalize-competitive-match'),
+    path('competitive/schedule/<int:match_id>/', views.schedule_match, name='schedule-match'),
+    path('competitive/recommend/', views.recommend_competitive_match, name='recommend-match'),
+    path('competitive/matches/', views.list_competitive_matches, name='competitive-matches'),
+    path("owner/competitive-matches/", views.owner_competitive_matches),
+    path('competitive/leaderboard/', views.competitive_leaderboard),
+
+   
+
 ]
