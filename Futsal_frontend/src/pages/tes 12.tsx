@@ -230,6 +230,21 @@ export default function ManageSlots() {
                             ? "Booked"
                             : "Available"}
                         </span>
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            isCompleted
+                              ? "bg-gray-100 text-gray-600"
+                              : slot.is_booked
+                              ? "bg-red-100 text-red-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {isCompleted
+                            ? "Completed"
+                            : slot.is_booked
+                            ? "Booked"
+                            : "Available"}
+                        </span>
                       </div>
 
                       {slot.is_booked && (
