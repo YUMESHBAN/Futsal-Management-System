@@ -8,7 +8,7 @@ from .views import (
     TimeSlotListCreateView,
     TimeSlotDetailView,
 
-    # Team & Players
+    #For  Team & Players
     TeamListCreateView,
     MyTeamView,
     TeamDetailView,
@@ -16,21 +16,21 @@ from .views import (
     PlayerListCreateView,
     OtherTeamsListView,
 
-    # Matches
+    #For Matches
     TeamMatchListCreateView,
     AcceptMatchView,
     RejectMatchView,
     UpdateMatchResultView,
     GenerateTimeSlotsView,
 
-    # Payment
+    #For Payment
     esewa_success_callback,
     esewa_failure_callback,
     SendPaymentEmailView, 
     ConfirmPaymentView,
 
 
-    # Competitive
+    #For Competitive
     RecommendedOpponentsView,
     SendMatchRequestView,
     RespondMatchRequestView,
@@ -65,14 +65,14 @@ urlpatterns = [
     path('team-matches/<int:match_id>/reject/', RejectMatchView.as_view(), name='reject-match'),
     
 
-
+    # ----- Payment and update -----
     path("api/payments/callback/success/", esewa_success_callback),
     path("api/payments/callback/failure/", esewa_failure_callback),
     path('team-matches/<int:match_id>/send-payment-email/', SendPaymentEmailView.as_view(), name='send_payment_email'),
     path('team-matches/<int:match_id>/confirm-payment/', ConfirmPaymentView.as_view(), name='confirm_payment'),
     path('team-matches/<int:match_id>/update-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
 
-
+    # ----- Competitive matches -----
     path('competitive/request/<int:team_id>/', views.send_match_request, name='send-competitive-request'),
     path('competitive/respond/<int:match_id>/', views.respond_to_match_request, name='respond-competitive-request'),
     path('competitive/finalize/', views.finalize_match, name='finalize-competitive-match'),
