@@ -875,13 +875,15 @@ def finalize_match(request):
     if winner_team not in [match.team_1, match.team_2]:
         return Response({'error': 'Winner must be one of the participating teams.'}, status=400)
 
-    # Finalize match
+    # ✅ Save match results
     match.winner = winner_team
+    match.goals_team_1 = goals_team_1
+    match.goals_team_2 = goals_team_2
     match.status = 'completed'
     match.is_completed = True
     match.save()
 
-    # Call elo update with goals
+    # ✅ Call elo update with saved goals
     result = update_elo(
         team_a=match.team_1,
         team_b=match.team_2,
@@ -891,10 +893,9 @@ def finalize_match(request):
     )
 
     return Response({
-        'message': 'Match finalized and ELO updated.',
+        'message': 'Match finalized, goals saved, and ELO updated.',
         'elo_result': result
     }, status=200)
-
 
 
 @api_view(['GET'])

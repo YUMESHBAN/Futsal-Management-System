@@ -1,7 +1,7 @@
 from collections import defaultdict
 import math
-from futsal_app.models import Team
-from futsal_app.models import Match
+from futsal_app.models import Team, Match
+
 
 def cosine_similarity(vec1, vec2):
     # Dot product
@@ -14,32 +14,79 @@ def cosine_similarity(vec1, vec2):
     return dot / (norm1 * norm2)
 
 
+def opponent_stats(team_id, opponent_id, matches):
+    """
+    Returns [played, win_rate, avg_goal_diff] for team vs opponent
+    """
+    games = [
+        m for m in matches if
+        (m.team_1.id == team_id and m.team_2.id == opponent_id) or
+        (m.team_2.id == team_id and m.team_1.id == opponent_id)
+    ]
+
+    if not games:
+        return [0, 0.0, 0.0]
+
+    played = 1
+    wins = 0
+    goal_diff = 0
+
+    for m in games:
+        if not m.is_completed:
+            continue  # skip unfinished matches
+
+        if m.team_1.id == team_id:
+            goals_for, goals_against = m.goals_team_1, m.goals_team_2
+        else:
+            goals_for, goals_against = m.goals_team_2, m.goals_team_1
+
+        if goals_for is None or goals_against is None:
+            continue  # ignore incomplete goal data
+
+        if goals_for > goals_against:
+            wins += 1
+        elif goals_for == goals_against:
+            wins += 0.5  # draw = half-win
+
+        goal_diff += (goals_for - goals_against)
+
+    if not games:
+        return [0, 0.0, 0.0]
+
+    win_rate = wins / len(games)
+    avg_goal_diff = goal_diff / len(games)
+
+    return [played, win_rate, avg_goal_diff]
+
+
+def build_vector(team_id, all_opponents, matches):
+    """
+    Build a multi-dimensional vector for the team across all opponents.
+    Each opponent contributes [played, win_rate, avg_goal_diff].
+    """
+    vector = []
+    for opp in all_opponents:
+        if opp == team_id:
+            continue
+        vector.extend(opponent_stats(team_id, opp, matches))
+    return vector
+
+
 def recommend_by_collab(target_team_id, top_n=5):
-    # 1. Gather opponent sets
+    # 1. Gather matches and teams
     matches = Match.objects.filter(match_type='competitive')
-    team_opponents = defaultdict(set)
+    all_teams = {m.team_1.id for m in matches} | {m.team_2.id for m in matches}
+    all_opponents = sorted(list(all_teams))
 
-    all_teams = set()
-    for match in matches:
-        t1, t2 = match.team_1.id, match.team_2.id
-        team_opponents[t1].add(t2)
-        team_opponents[t2].add(t1)
-        all_teams.update([t1, t2])
-
-    all_opponents = sorted(list(all_teams))  # Treat all teams as potential opponents
-
-    # 2. Create binary vectors (rows = teams, columns = opponents)
-    def build_vector(team_id):
-        return [1 if opp in team_opponents[team_id] else 0 for opp in all_opponents]
-
-    target_vector = build_vector(target_team_id)
+    # 2. Build target vector
+    target_vector = build_vector(target_team_id, all_opponents, matches)
 
     # 3. Compute cosine similarity with every other team
     similarities = []
     for team_id in all_teams:
         if team_id == target_team_id:
             continue
-        vec = build_vector(team_id)
+        vec = build_vector(team_id, all_opponents, matches)
         sim = cosine_similarity(target_vector, vec)
         similarities.append((team_id, sim))
 

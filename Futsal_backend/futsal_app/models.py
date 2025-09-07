@@ -176,6 +176,10 @@ class Match(models.Model):
     winner = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True, related_name='matches_won')
     is_completed = models.BooleanField(default=False)
 
+    # 🔥 Add these:
+    goals_team_1 = models.IntegerField(null=True, blank=True)
+    goals_team_2 = models.IntegerField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
