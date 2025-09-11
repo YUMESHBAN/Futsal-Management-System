@@ -2,7 +2,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import Image from "../assets/FootballIcon.png";
+import Image from "../../assets/FootballIcon.png";
 
 interface Player {
   id: number;
@@ -16,6 +16,7 @@ interface Player {
 interface Team {
   id: number;
   name: string;
+  location: string;
   owner: number;
   created_at: string;
   players: Player[];
@@ -206,52 +207,63 @@ export default function MyTeam() {
     );
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 bg-white shadow p-6 rounded-lg">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl mx-auto mt-10 bg-white shadow-lg p-8 rounded-xl">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
         {editingTeamName ? (
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <input
               value={team.name}
               onChange={(e) => setTeam({ ...team, name: e.target.value })}
-              className="border rounded px-3 py-1"
+              className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
             />
             <button
               onClick={handleTeamNameUpdate}
-              className="btn btn-sm btn-primary"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
             >
               Save
             </button>
             <button
               onClick={handleDeleteTeam}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded text-sm ml-4"
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
             >
               Delete Team
             </button>
           </div>
         ) : (
-          <>
-            <h2
-              className="text-3xl font-bold text-gray-800 cursor-pointer"
-              onClick={() => setEditingTeamName(true)}
-            >
-              My Team: {team.name}
-            </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-4">
+            <div>
+              <h2
+                className="text-3xl font-extrabold text-gray-800 hover:text-blue-600 transition cursor-pointer"
+                onClick={() => setEditingTeamName(true)}
+              >
+                🏆 {team.name}
+              </h2>
+              <p
+                className="text-gray-600 mt-1 hover:underline cursor-pointer"
+                onClick={() => setEditingTeamName(true)}
+              >
+                📍 {team.location}
+              </p>
+            </div>
             <button
               onClick={() => setAddingPlayer(true)}
-              className="ml-4 btn btn-sm btn-success"
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg shadow transition flex items-center gap-2"
             >
-              + Add Player
+              ➕ Add Player
             </button>
-          </>
+          </div>
         )}
       </div>
 
+      {/* Players Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {team.players.map((player) => (
           <div
             key={player.id}
-            className="border rounded-lg p-4 bg-gray-50 shadow-sm text-center relative"
+            className="border rounded-xl p-5 bg-gray-50 shadow hover:shadow-md transition text-center relative"
           >
+            {/* Profile Picture */}
             <label htmlFor={`photo-${player.id}`}>
               <img
                 src={
@@ -262,7 +274,7 @@ export default function MyTeam() {
                     : Image
                 }
                 alt={player.name}
-                className="w-24 h-24 mx-auto rounded-full object-cover mb-3 cursor-pointer hover:opacity-80"
+                className="w-24 h-24 mx-auto rounded-full object-cover mb-3 cursor-pointer hover:opacity-80 border-2 border-gray-200"
               />
             </label>
             <input
@@ -272,37 +284,41 @@ export default function MyTeam() {
               accept="image/*"
               onChange={(e) => handlePhotoChange(player.id, e)}
             />
-            <h3 className="text-lg font-semibold">{player.name}</h3>
-            <p className="text-sm text-gray-600">{getRole(player)}</p>
+
+            {/* Info */}
+            <h3 className="text-lg font-bold text-gray-800">{player.name}</h3>
+            <p className="text-sm text-blue-600">{getRole(player)}</p>
             <p className="text-sm text-gray-500">Age: {player.age}</p>
 
-            <div className="flex justify-center gap-3 mt-2">
+            {/* Actions */}
+            <div className="flex justify-center gap-4 mt-3">
               <button
-                className="text-blue-600 text-sm"
+                className="text-blue-600 text-sm hover:underline"
                 onClick={() => setEditingPlayer(player)}
               >
-                Edit
+                ✏️ Edit
               </button>
               <button
-                className="text-red-600 text-sm"
+                className="text-red-600 text-sm hover:underline"
                 onClick={() => setShowDeleteConfirm(player.id)}
               >
-                Delete
+                🗑️ Delete
               </button>
             </div>
 
+            {/* Delete confirmation */}
             {showDeleteConfirm === player.id && (
-              <div className="mt-2 text-sm text-gray-700">
+              <div className="mt-3 text-sm text-gray-700">
                 Confirm delete?
-                <div className="flex gap-2 justify-center mt-1">
+                <div className="flex gap-2 justify-center mt-2">
                   <button
-                    className="text-white bg-red-500 px-2 py-1 rounded"
+                    className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
                     onClick={() => handlePlayerDelete(player.id)}
                   >
                     Yes
                   </button>
                   <button
-                    className="text-gray-700 px-2 py-1"
+                    className="px-3 py-1 rounded text-sm border"
                     onClick={() => setShowDeleteConfirm(null)}
                   >
                     No
@@ -316,8 +332,8 @@ export default function MyTeam() {
 
       {/* Edit Player Modal */}
       {editingPlayer && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
             <h3 className="text-xl font-bold mb-4">Edit Player</h3>
             <input
               value={editingPlayer.name}
@@ -325,7 +341,7 @@ export default function MyTeam() {
                 setEditingPlayer({ ...editingPlayer, name: e.target.value })
               }
               placeholder="Name"
-              className="w-full border px-3 py-2 mb-2"
+              className="w-full border rounded-lg px-3 py-2 mb-3"
             />
             <input
               type="number"
@@ -337,10 +353,10 @@ export default function MyTeam() {
                 })
               }
               placeholder="Age"
-              className="w-full border px-3 py-2 mb-2"
+              className="w-full border rounded-lg px-3 py-2 mb-3"
             />
-            <div className="flex items-center gap-3 mb-4">
-              <label className="flex items-center gap-1">
+            <div className="flex items-center gap-4 mb-4">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={editingPlayer.is_captain}
@@ -353,7 +369,7 @@ export default function MyTeam() {
                 />
                 Captain
               </label>
-              <label className="flex items-center gap-1">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={editingPlayer.is_goalkeeper}
@@ -367,16 +383,16 @@ export default function MyTeam() {
                 Goalkeeper
               </label>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => setEditingPlayer(null)}
-                className="text-gray-600"
+                className="px-4 py-2 rounded-lg border"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePlayerEdit}
-                className="bg-blue-600 text-white px-4 py-1 rounded"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
                 Save
               </button>
@@ -387,8 +403,8 @@ export default function MyTeam() {
 
       {/* Add Player Modal */}
       {addingPlayer && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
             <h3 className="text-xl font-bold mb-4">Add Player</h3>
             <input
               value={newPlayer.name}
@@ -396,7 +412,7 @@ export default function MyTeam() {
                 setNewPlayer({ ...newPlayer, name: e.target.value })
               }
               placeholder="Player Name"
-              className="w-full border px-3 py-2 mb-2"
+              className="w-full border rounded-lg px-3 py-2 mb-3"
             />
             <input
               type="number"
@@ -408,11 +424,10 @@ export default function MyTeam() {
                   age: parseInt(e.target.value) || 0,
                 })
               }
-              className="w-full border px-3 py-2 mb-2"
+              className="w-full border rounded-lg px-3 py-2 mb-3"
             />
-
-            <div className="flex items-center gap-3 mb-4">
-              <label className="flex items-center gap-1">
+            <div className="flex items-center gap-4 mb-4">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={newPlayer.is_captain}
@@ -422,7 +437,7 @@ export default function MyTeam() {
                 />
                 Captain
               </label>
-              <label className="flex items-center gap-1">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={newPlayer.is_goalkeeper}
@@ -436,16 +451,16 @@ export default function MyTeam() {
                 Goalkeeper
               </label>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => setAddingPlayer(false)}
-                className="text-gray-600"
+                className="px-4 py-2 rounded-lg border"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddPlayer}
-                className="bg-green-600 text-white px-4 py-1 rounded"
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
               >
                 Add
               </button>
