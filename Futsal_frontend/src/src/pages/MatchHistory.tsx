@@ -81,25 +81,30 @@ export default function MatchHistory() {
   const matchHistory = matches.filter((m) => m.accepted !== null);
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 space-y-8">
-      <h1 className="text-3xl font-bold text-center text-gray-800">
-        Match Center
+    <div className="max-w-4xl mx-auto mt-10 space-y-10">
+      <h1 className="text-3xl font-bold text-center text-green-700">
+        ⚽ Match Center
       </h1>
 
       {/* Sent Invites */}
       <section>
-        <h2 className="text-xl font-semibold mb-2">Sent Invitations</h2>
+        <h2 className="text-xl font-semibold mb-3 text-gray-800">
+          📤 Sent Invitations
+        </h2>
         {sentInvites.length === 0 ? (
           <p className="text-gray-600">No sent invitations.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {sentInvites.map((m) => (
               <li
                 key={m.id}
-                className="bg-yellow-100 border p-3 rounded shadow-sm text-gray-800"
+                className="bg-green-50 border border-green-200 p-4 rounded-lg shadow-sm text-gray-800"
               >
-                You invited <b>{m.team_2_name}</b> for a {m.match_type} match on{" "}
-                {new Date(m.scheduled_time).toLocaleString()}
+                You invited <b>{m.team_2_name}</b> for a{" "}
+                <span className="text-green-700 font-medium">
+                  {m.match_type}
+                </span>{" "}
+                match on {new Date(m.scheduled_time).toLocaleString()}
               </li>
             ))}
           </ul>
@@ -108,30 +113,36 @@ export default function MatchHistory() {
 
       {/* Received Invites */}
       <section>
-        <h2 className="text-xl font-semibold mb-2">Received Invitations</h2>
+        <h2 className="text-xl font-semibold mb-3 text-gray-800">
+          📥 Received Invitations
+        </h2>
         {receivedInvites.length === 0 ? (
           <p className="text-gray-600">No received invitations.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {receivedInvites.map((m) => (
               <li
                 key={m.id}
-                className="bg-blue-100 border p-4 rounded shadow-sm text-gray-800 flex flex-col sm:flex-row justify-between items-center"
+                className="bg-white border border-green-200 p-4 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center"
               >
-                <div className="mb-2 sm:mb-0">
-                  <b>{m.team_1_name}</b> invited you for a {m.match_type} match
-                  on {new Date(m.scheduled_time).toLocaleString()}
+                <div className="mb-2 sm:mb-0 text-gray-800">
+                  <b className="text-green-700">{m.team_1_name}</b> invited you
+                  for a{" "}
+                  <span className="font-medium text-green-700">
+                    {m.match_type}
+                  </span>{" "}
+                  match on {new Date(m.scheduled_time).toLocaleString()}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleInvitationResponse(m.id, "accept")}
-                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm shadow"
                   >
                     Accept
                   </button>
                   <button
                     onClick={() => handleInvitationResponse(m.id, "reject")}
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm shadow"
                   >
                     Reject
                   </button>
@@ -144,21 +155,29 @@ export default function MatchHistory() {
 
       {/* Match History */}
       <section>
-        <h2 className="text-xl font-semibold mb-2">Match History</h2>
+        <h2 className="text-xl font-semibold mb-3 text-gray-800">
+          📜 Match History
+        </h2>
         {matchHistory.length === 0 ? (
           <p className="text-gray-600">No matches played yet.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {matchHistory.map((m) => (
               <li
                 key={m.id}
-                className={`border p-3 rounded shadow-sm ${
-                  m.accepted ? "bg-green-100" : "bg-red-100"
-                } text-gray-800`}
+                className={`border p-4 rounded-lg shadow-sm text-gray-800 ${
+                  m.accepted
+                    ? "bg-green-50 border-green-200"
+                    : "bg-red-50 border-red-200"
+                }`}
               >
-                {m.team_1_name} vs {m.team_2_name} — {m.match_type} on{" "}
+                <span className="font-semibold">{m.team_1_name}</span> vs{" "}
+                <span className="font-semibold">{m.team_2_name}</span> —{" "}
+                <span className="text-green-700">{m.match_type}</span> on{" "}
                 {new Date(m.scheduled_time).toLocaleString()} —{" "}
-                <b>{m.accepted ? "Accepted" : "Rejected"}</b>
+                <b className={m.accepted ? "text-green-700" : "text-red-600"}>
+                  {m.accepted ? "Accepted" : "Rejected"}
+                </b>
               </li>
             ))}
           </ul>
