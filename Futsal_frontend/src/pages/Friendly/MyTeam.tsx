@@ -211,270 +211,274 @@ export default function MyTeam() {
   return (
     <div>
       <Header />
-      <div className="max-w-6xl mx-auto mt-10 bg-white shadow-lg p-8 rounded-xl m-5">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
-          {editingTeamName ? (
-            <div className="flex flex-wrap gap-2 items-center">
-              <input
-                value={team.name}
-                onChange={(e) => setTeam({ ...team, name: e.target.value })}
-                className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <button
-                onClick={handleTeamNameUpdate}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-              >
-                Save
-              </button>
-              <button
-                onClick={handleDeleteTeam}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-              >
-                Delete Team
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-4">
-              <div>
-                <h2
-                  className="text-3xl font-extrabold text-gray-800 hover:text-blue-600 transition cursor-pointer"
-                  onClick={() => setEditingTeamName(true)}
-                >
-                  🏆 {team.name}
-                </h2>
-                <p
-                  className="text-gray-600 mt-1 hover:underline cursor-pointer"
-                  onClick={() => setEditingTeamName(true)}
-                >
-                  📍 {team.location}
-                </p>
-              </div>
-              <button
-                onClick={() => setAddingPlayer(true)}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg shadow transition flex items-center gap-2"
-              >
-                ➕ Add Player
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Players Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {team.players.map((player) => (
-            <div
-              key={player.id}
-              className="border rounded-xl p-5 bg-gray-50 shadow hover:shadow-md transition text-center relative"
-            >
-              {/* Profile Picture */}
-              <label htmlFor={`photo-${player.id}`}>
-                <img
-                  src={
-                    player.photo
-                      ? player.photo.startsWith("http")
-                        ? player.photo
-                        : `http://127.0.0.1:8000${player.photo}`
-                      : Image
-                  }
-                  alt={player.name}
-                  className="w-24 h-24 mx-auto rounded-full object-cover mb-3 cursor-pointer hover:opacity-80 border-2 border-gray-200"
+      <div className=" bg-gradient-to-br from-green-50 to-green-100 p-8 ">
+        <div className="max-w-6xl mx-auto mt-10 bg-white shadow-lg p-8 rounded-xl m-5">
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+            {editingTeamName ? (
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  value={team.name}
+                  onChange={(e) => setTeam({ ...team, name: e.target.value })}
+                  className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-              </label>
-              <input
-                type="file"
-                id={`photo-${player.id}`}
-                className="hidden"
-                accept="image/*"
-                onChange={(e) => handlePhotoChange(player.id, e)}
-              />
-
-              {/* Info */}
-              <h3 className="text-lg font-bold text-gray-800">{player.name}</h3>
-              <p className="text-sm text-blue-600">{getRole(player)}</p>
-              <p className="text-sm text-gray-500">Age: {player.age}</p>
-
-              {/* Actions */}
-              <div className="flex justify-center gap-4 mt-3">
                 <button
-                  className="text-blue-600 text-sm hover:underline"
-                  onClick={() => setEditingPlayer(player)}
-                >
-                  ✏️ Edit
-                </button>
-                <button
-                  className="text-red-600 text-sm hover:underline"
-                  onClick={() => setShowDeleteConfirm(player.id)}
-                >
-                  🗑️ Delete
-                </button>
-              </div>
-
-              {/* Delete confirmation */}
-              {showDeleteConfirm === player.id && (
-                <div className="mt-3 text-sm text-gray-700">
-                  Confirm delete?
-                  <div className="flex gap-2 justify-center mt-2">
-                    <button
-                      className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
-                      onClick={() => handlePlayerDelete(player.id)}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      className="px-3 py-1 rounded text-sm border"
-                      onClick={() => setShowDeleteConfirm(null)}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Edit Player Modal */}
-        {editingPlayer && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h3 className="text-xl font-bold mb-4">Edit Player</h3>
-              <input
-                value={editingPlayer.name}
-                onChange={(e) =>
-                  setEditingPlayer({ ...editingPlayer, name: e.target.value })
-                }
-                placeholder="Name"
-                className="w-full border rounded-lg px-3 py-2 mb-3"
-              />
-              <input
-                type="number"
-                value={editingPlayer.age}
-                onChange={(e) =>
-                  setEditingPlayer({
-                    ...editingPlayer,
-                    age: parseInt(e.target.value) || 0,
-                  })
-                }
-                placeholder="Age"
-                className="w-full border rounded-lg px-3 py-2 mb-3"
-              />
-              <div className="flex items-center gap-4 mb-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingPlayer.is_captain}
-                    onChange={(e) =>
-                      setEditingPlayer({
-                        ...editingPlayer,
-                        is_captain: e.target.checked,
-                      })
-                    }
-                  />
-                  Captain
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingPlayer.is_goalkeeper}
-                    onChange={(e) =>
-                      setEditingPlayer({
-                        ...editingPlayer,
-                        is_goalkeeper: e.target.checked,
-                      })
-                    }
-                  />
-                  Goalkeeper
-                </label>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setEditingPlayer(null)}
-                  className="px-4 py-2 rounded-lg border"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePlayerEdit}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                  onClick={handleTeamNameUpdate}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
                 >
                   Save
                 </button>
+                <button
+                  onClick={handleDeleteTeam}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                >
+                  Delete Team
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-4">
+                <div>
+                  <h2
+                    className="text-3xl font-extrabold text-gray-800 hover:text-blue-600 transition cursor-pointer"
+                    onClick={() => setEditingTeamName(true)}
+                  >
+                    🏆 {team.name}
+                  </h2>
+                  <p
+                    className="text-gray-600 mt-1 hover:underline cursor-pointer"
+                    onClick={() => setEditingTeamName(true)}
+                  >
+                    📍 {team.location}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAddingPlayer(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg shadow transition flex items-center gap-2"
+                >
+                  ➕ Add Player
+                </button>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Add Player Modal */}
-        {addingPlayer && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h3 className="text-xl font-bold mb-4">Add Player</h3>
-              <input
-                value={newPlayer.name}
-                onChange={(e) =>
-                  setNewPlayer({ ...newPlayer, name: e.target.value })
-                }
-                placeholder="Player Name"
-                className="w-full border rounded-lg px-3 py-2 mb-3"
-              />
-              <input
-                type="number"
-                placeholder="Player Age"
-                value={newPlayer.age || ""}
-                onChange={(e) =>
-                  setNewPlayer({
-                    ...newPlayer,
-                    age: parseInt(e.target.value) || 0,
-                  })
-                }
-                className="w-full border rounded-lg px-3 py-2 mb-3"
-              />
-              <div className="flex items-center gap-4 mb-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={newPlayer.is_captain}
-                    onChange={(e) =>
-                      setNewPlayer({
-                        ...newPlayer,
-                        is_captain: e.target.checked,
-                      })
+          {/* Players Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {team.players.map((player) => (
+              <div
+                key={player.id}
+                className="border rounded-xl p-5 bg-gray-50 shadow hover:shadow-md transition text-center relative"
+              >
+                {/* Profile Picture */}
+                <label htmlFor={`photo-${player.id}`}>
+                  <img
+                    src={
+                      player.photo
+                        ? player.photo.startsWith("http")
+                          ? player.photo
+                          : `http://127.0.0.1:8000${player.photo}`
+                        : Image
                     }
+                    alt={player.name}
+                    className="w-24 h-24 mx-auto rounded-full object-cover mb-3 cursor-pointer hover:opacity-80 border-2 border-gray-200"
                   />
-                  Captain
                 </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={newPlayer.is_goalkeeper}
-                    onChange={(e) =>
-                      setNewPlayer({
-                        ...newPlayer,
-                        is_goalkeeper: e.target.checked,
-                      })
-                    }
-                  />
-                  Goalkeeper
-                </label>
+                <input
+                  type="file"
+                  id={`photo-${player.id}`}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handlePhotoChange(player.id, e)}
+                />
+
+                {/* Info */}
+                <h3 className="text-lg font-bold text-gray-800">
+                  {player.name}
+                </h3>
+                <p className="text-sm text-blue-600">{getRole(player)}</p>
+                <p className="text-sm text-gray-500">Age: {player.age}</p>
+
+                {/* Actions */}
+                <div className="flex justify-center gap-4 mt-3">
+                  <button
+                    className="text-blue-600 text-sm hover:underline"
+                    onClick={() => setEditingPlayer(player)}
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    className="text-red-600 text-sm hover:underline"
+                    onClick={() => setShowDeleteConfirm(player.id)}
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+
+                {/* Delete confirmation */}
+                {showDeleteConfirm === player.id && (
+                  <div className="mt-3 text-sm text-gray-700">
+                    Confirm delete?
+                    <div className="flex gap-2 justify-center mt-2">
+                      <button
+                        className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                        onClick={() => handlePlayerDelete(player.id)}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        className="px-3 py-1 rounded text-sm border"
+                        onClick={() => setShowDeleteConfirm(null)}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setAddingPlayer(false)}
-                  className="px-4 py-2 rounded-lg border"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddPlayer}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                >
-                  Add
-                </button>
+            ))}
+          </div>
+
+          {/* Edit Player Modal */}
+          {editingPlayer && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4">Edit Player</h3>
+                <input
+                  value={editingPlayer.name}
+                  onChange={(e) =>
+                    setEditingPlayer({ ...editingPlayer, name: e.target.value })
+                  }
+                  placeholder="Name"
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                />
+                <input
+                  type="number"
+                  value={editingPlayer.age}
+                  onChange={(e) =>
+                    setEditingPlayer({
+                      ...editingPlayer,
+                      age: parseInt(e.target.value) || 0,
+                    })
+                  }
+                  placeholder="Age"
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                />
+                <div className="flex items-center gap-4 mb-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editingPlayer.is_captain}
+                      onChange={(e) =>
+                        setEditingPlayer({
+                          ...editingPlayer,
+                          is_captain: e.target.checked,
+                        })
+                      }
+                    />
+                    Captain
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editingPlayer.is_goalkeeper}
+                      onChange={(e) =>
+                        setEditingPlayer({
+                          ...editingPlayer,
+                          is_goalkeeper: e.target.checked,
+                        })
+                      }
+                    />
+                    Goalkeeper
+                  </label>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setEditingPlayer(null)}
+                    className="px-4 py-2 rounded-lg border"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePlayerEdit}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Add Player Modal */}
+          {addingPlayer && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4">Add Player</h3>
+                <input
+                  value={newPlayer.name}
+                  onChange={(e) =>
+                    setNewPlayer({ ...newPlayer, name: e.target.value })
+                  }
+                  placeholder="Player Name"
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                />
+                <input
+                  type="number"
+                  placeholder="Player Age"
+                  value={newPlayer.age || ""}
+                  onChange={(e) =>
+                    setNewPlayer({
+                      ...newPlayer,
+                      age: parseInt(e.target.value) || 0,
+                    })
+                  }
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                />
+                <div className="flex items-center gap-4 mb-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={newPlayer.is_captain}
+                      onChange={(e) =>
+                        setNewPlayer({
+                          ...newPlayer,
+                          is_captain: e.target.checked,
+                        })
+                      }
+                    />
+                    Captain
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={newPlayer.is_goalkeeper}
+                      onChange={(e) =>
+                        setNewPlayer({
+                          ...newPlayer,
+                          is_goalkeeper: e.target.checked,
+                        })
+                      }
+                    />
+                    Goalkeeper
+                  </label>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setAddingPlayer(false)}
+                    className="px-4 py-2 rounded-lg border"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddPlayer}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <Footer />
     </div>

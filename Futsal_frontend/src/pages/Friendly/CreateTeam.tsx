@@ -164,178 +164,184 @@ export default function CreateTeam() {
   return (
     <div>
       <Header />
-      <div className="max-w-2xl mx-auto p-8 bg-white shadow-lg rounded-2xl m-5">
-        <h2 className="text-3xl font-extrabold text-center mb-6 text-[#2E8B57]">
-          Create Your Team
-        </h2>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-8">
+        <div className="max-w-2xl mx-auto p-8 bg-white shadow-lg rounded-2xl m-5">
+          <h2 className="text-3xl font-extrabold text-center mb-6 text-[#2E8B57]">
+            Create Your Team
+          </h2>
 
-        {errors && (
-          <div className="bg-red-100 text-red-700 border border-red-300 rounded-md p-3 mb-6 text-center font-semibold">
-            {errors}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Team info */}
-          <div className="space-y-4">
-            <div>
-              <label className="block font-semibold mb-1">Team Name</label>
-              <input
-                type="text"
-                value={teamData.name}
-                onChange={(e) =>
-                  setTeamData({ ...teamData, name: e.target.value })
-                }
-                required
-                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
-                placeholder="Enter team name"
-              />
+          {errors && (
+            <div className="bg-red-100 text-red-700 border border-red-300 rounded-md p-3 mb-6 text-center font-semibold">
+              {errors}
             </div>
+          )}
 
-            <div>
-              <label className="block font-semibold mb-1">Location</label>
-              <input
-                type="text"
-                value={teamData.location}
-                onChange={(e) =>
-                  setTeamData({ ...teamData, location: e.target.value })
-                }
-                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
-                placeholder="City / Area"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold mb-1">Skill Level</label>
-              <input
-                type="text"
-                value={teamData.skill_level}
-                onChange={(e) =>
-                  setTeamData({ ...teamData, skill_level: e.target.value })
-                }
-                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
-                placeholder="Beginner, Intermediate, Pro..."
-              />
-            </div>
-          </div>
-
-          {/* Home futsal */}
-          <div>
-            <label className="block font-semibold mb-1">
-              Home Futsal (Optional)
-            </label>
-            <select
-              value={teamData.futsal_id ?? ""}
-              onChange={(e) =>
-                setTeamData({
-                  ...teamData,
-                  futsal_id: e.target.value ? parseInt(e.target.value) : null,
-                })
-              }
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
-            >
-              <option value="">-- Select --</option>
-              {futsals.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} - {f.location}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Preferred futsals */}
-          <div>
-            <label className="block font-semibold mb-2">
-              Preferred Futsals{" "}
-              <span className="text-sm text-gray-500">(Select at least 2)</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {futsals.map((futsal) => (
-                <label
-                  key={futsal.id}
-                  className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={teamData.preferred_futsal_ids.includes(futsal.id)}
-                    onChange={() => togglePreferredFutsal(futsal.id)}
-                    className="h-4 w-4"
-                  />
-                  <span>
-                    {futsal.name} - {futsal.location}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Players */}
-          <div>
-            <h3 className="font-semibold mb-3">
-              Players <span className="text-sm text-gray-500">(min 2)</span>
-            </h3>
-            {players.map((player, idx) => (
-              <div key={idx} className="border rounded-lg p-4 mb-4 shadow-sm">
-                <label className="block mb-2 font-semibold">
-                  Player {idx + 1}
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={player.name}
-                    onChange={(e) =>
-                      handlePlayerChange(idx, "name", e.target.value)
-                    }
-                    required
-                    className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-[#2E8B57] outline-none"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Age"
-                    min={1}
-                    value={player.age || ""}
-                    onChange={(e) =>
-                      handlePlayerChange(idx, "age", e.target.value)
-                    }
-                    required
-                    className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-[#2E8B57] outline-none"
-                  />
-                </div>
-                {players.length > 2 && (
-                  <button
-                    type="button"
-                    className="mt-3 text-red-600 hover:underline"
-                    onClick={() => removePlayer(idx)}
-                  >
-                    Remove Player
-                  </button>
-                )}
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Team info */}
+            <div className="space-y-4">
+              <div>
+                <label className="block font-semibold mb-1">Team Name</label>
+                <input
+                  type="text"
+                  value={teamData.name}
+                  onChange={(e) =>
+                    setTeamData({ ...teamData, name: e.target.value })
+                  }
+                  required
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
+                  placeholder="Enter team name"
+                />
               </div>
-            ))}
 
+              <div>
+                <label className="block font-semibold mb-1">Location</label>
+                <input
+                  type="text"
+                  value={teamData.location}
+                  onChange={(e) =>
+                    setTeamData({ ...teamData, location: e.target.value })
+                  }
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
+                  placeholder="City / Area"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Skill Level</label>
+                <input
+                  type="text"
+                  value={teamData.skill_level}
+                  onChange={(e) =>
+                    setTeamData({ ...teamData, skill_level: e.target.value })
+                  }
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
+                  placeholder="Beginner, Intermediate, Pro..."
+                />
+              </div>
+            </div>
+
+            {/* Home futsal */}
+            <div>
+              <label className="block font-semibold mb-1">
+                Home Futsal (Optional)
+              </label>
+              <select
+                value={teamData.futsal_id ?? ""}
+                onChange={(e) =>
+                  setTeamData({
+                    ...teamData,
+                    futsal_id: e.target.value ? parseInt(e.target.value) : null,
+                  })
+                }
+                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-[#2E8B57] outline-none"
+              >
+                <option value="">-- Select --</option>
+                {futsals.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} - {f.location}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Preferred futsals */}
+            <div>
+              <label className="block font-semibold mb-2">
+                Preferred Futsals{" "}
+                <span className="text-sm text-gray-500">
+                  (Select at least 2)
+                </span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {futsals.map((futsal) => (
+                  <label
+                    key={futsal.id}
+                    className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={teamData.preferred_futsal_ids.includes(
+                        futsal.id
+                      )}
+                      onChange={() => togglePreferredFutsal(futsal.id)}
+                      className="h-4 w-4"
+                    />
+                    <span>
+                      {futsal.name} - {futsal.location}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Players */}
+            <div>
+              <h3 className="font-semibold mb-3">
+                Players <span className="text-sm text-gray-500">(min 2)</span>
+              </h3>
+              {players.map((player, idx) => (
+                <div key={idx} className="border rounded-lg p-4 mb-4 shadow-sm">
+                  <label className="block mb-2 font-semibold">
+                    Player {idx + 1}
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      value={player.name}
+                      onChange={(e) =>
+                        handlePlayerChange(idx, "name", e.target.value)
+                      }
+                      required
+                      className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-[#2E8B57] outline-none"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Age"
+                      min={1}
+                      value={player.age || ""}
+                      onChange={(e) =>
+                        handlePlayerChange(idx, "age", e.target.value)
+                      }
+                      required
+                      className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-[#2E8B57] outline-none"
+                    />
+                  </div>
+                  {players.length > 2 && (
+                    <button
+                      type="button"
+                      className="mt-3 text-red-600 hover:underline"
+                      onClick={() => removePlayer(idx)}
+                    >
+                      Remove Player
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addPlayer}
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                + Add Player
+              </button>
+            </div>
+
+            {/* Submit */}
             <button
-              type="button"
-              onClick={addPlayer}
-              className="text-blue-600 font-semibold hover:underline"
+              type="submit"
+              disabled={loading}
+              className={`w-full p-3 rounded-lg text-white font-semibold transition ${
+                loading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#2E8B57] hover:bg-green-700"
+              }`}
             >
-              + Add Player
+              {loading ? "Creating..." : "Create Team"}
             </button>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full p-3 rounded-lg text-white font-semibold transition ${
-              loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#2E8B57] hover:bg-green-700"
-            }`}
-          >
-            {loading ? "Creating..." : "Create Team"}
-          </button>
-        </form>
+          </form>
+        </div>
       </div>
       <Footer />
     </div>

@@ -135,135 +135,140 @@ export default function InviteTeam() {
   return (
     <div>
       <Header />
-      <div className="max-w-2xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-2xl m-5">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-          📩 Invite a Team
-        </h1>
+      <div className=" bg-gradient-to-br from-green-50 to-green-100 p-8">
+        <div className="max-w-2xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-2xl m-5">
+          <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+            📩 Invite a Team
+          </h1>
 
-        {error && (
-          <div className="text-red-500 bg-red-50 border border-red-200 px-4 py-2 rounded mb-4">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="text-red-500 bg-red-50 border border-red-200 px-4 py-2 rounded mb-4">
+              {error}
+            </div>
+          )}
 
-        <div className="space-y-5">
-          {/* Opponent Team */}
-          <div>
-            <label className="block mb-2 font-medium text-gray-700">
-              🏆 Opponent Team
-            </label>
-            <select
-              value={selectedTeam ?? ""}
-              onChange={(e) => setSelectedTeam(parseInt(e.target.value))}
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-green-400 outline-none"
-            >
-              <option value="" disabled>
-                Select a team
-              </option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
+          <div className="space-y-5">
+            {/* Opponent Team */}
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                🏆 Opponent Team
+              </label>
+              <select
+                value={selectedTeam ?? ""}
+                onChange={(e) => setSelectedTeam(parseInt(e.target.value))}
+                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-green-400 outline-none"
+              >
+                <option value="" disabled>
+                  Select a team
                 </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Futsal */}
-          <div>
-            <label className="block mb-2 font-medium text-gray-700">
-              ⚽ Select Futsal
-            </label>
-            <select
-              value={selectedFutsal ?? ""}
-              onChange={(e) => setSelectedFutsal(parseInt(e.target.value))}
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-green-400 outline-none"
-            >
-              <option value="" disabled>
-                Select a futsal
-              </option>
-              {futsals.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Time Slots */}
-          <div>
-            <label className="block mb-2 font-medium text-gray-700">
-              ⏰ Select Time Slot
-            </label>
-            {Object.keys(groupedSlots).length === 0 ? (
-              <div className="text-gray-500 text-center p-4 bg-gray-50 rounded">
-                No available slots
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-64 overflow-y-auto border rounded-lg p-3">
-                {Object.entries(groupedSlots).map(([date, slotList]) => (
-                  <div key={date} className="space-y-2">
-                    <h3 className="bg-green-600 text-white px-4 py-2 rounded-md font-medium">
-                      {date}
-                    </h3>
-                    <div className="grid gap-2">
-                      {slotList.map((slot) => (
-                        <label
-                          key={slot.id}
-                          className={`flex items-center justify-between p-3 rounded-lg cursor-pointer border transition ${
-                            selectedSlotId === slot.id
-                              ? "border-green-500 bg-green-50"
-                              : "border-gray-200 hover:bg-gray-100"
-                          }`}
-                        >
-                          <span>
-                            {new Date(slot.start_time).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}{" "}
-                            -{" "}
-                            {new Date(slot.end_time).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                          <input
-                            type="radio"
-                            name="slot"
-                            value={slot.id}
-                            checked={selectedSlotId === slot.id}
-                            onChange={() => setSelectedSlotId(slot.id)}
-                            className="accent-green-600"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
                 ))}
-              </div>
-            )}
-          </div>
+              </select>
+            </div>
 
-          {/* Match Type */}
-          <div>
-            <label className="block mb-2 font-medium text-gray-700">
-              🎮 Match Type
-            </label>
-            <select
-              value={matchType}
-              onChange={(e) => setMatchType(e.target.value)}
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-green-400 outline-none"
+            {/* Futsal */}
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                ⚽ Select Futsal
+              </label>
+              <select
+                value={selectedFutsal ?? ""}
+                onChange={(e) => setSelectedFutsal(parseInt(e.target.value))}
+                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-green-400 outline-none"
+              >
+                <option value="" disabled>
+                  Select a futsal
+                </option>
+                {futsals.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Time Slots */}
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                ⏰ Select Time Slot
+              </label>
+              {Object.keys(groupedSlots).length === 0 ? (
+                <div className="text-gray-500 text-center p-4 bg-gray-50 rounded">
+                  No available slots
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-64 overflow-y-auto border rounded-lg p-3">
+                  {Object.entries(groupedSlots).map(([date, slotList]) => (
+                    <div key={date} className="space-y-2">
+                      <h3 className="bg-green-600 text-white px-4 py-2 rounded-md font-medium">
+                        {date}
+                      </h3>
+                      <div className="grid gap-2">
+                        {slotList.map((slot) => (
+                          <label
+                            key={slot.id}
+                            className={`flex items-center justify-between p-3 rounded-lg cursor-pointer border transition ${
+                              selectedSlotId === slot.id
+                                ? "border-green-500 bg-green-50"
+                                : "border-gray-200 hover:bg-gray-100"
+                            }`}
+                          >
+                            <span>
+                              {new Date(slot.start_time).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )}{" "}
+                              -{" "}
+                              {new Date(slot.end_time).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            <input
+                              type="radio"
+                              name="slot"
+                              value={slot.id}
+                              checked={selectedSlotId === slot.id}
+                              onChange={() => setSelectedSlotId(slot.id)}
+                              className="accent-green-600"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Match Type */}
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                🎮 Match Type
+              </label>
+              <select
+                value={matchType}
+                onChange={(e) => setMatchType(e.target.value)}
+                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-green-400 outline-none"
+              >
+                <option value="friendly">Friendly Match</option>
+                <option value="friendly">Loser's Pay</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition"
             >
-              <option value="friendly">Friendly Match</option>
-              <option value="competitive">Loser's Pay</option>
-            </select>
+              🚀 Send Invitation
+            </button>
           </div>
-
-          <button
-            onClick={handleSubmit}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition"
-          >
-            🚀 Send Invitation
-          </button>
         </div>
       </div>
       <Footer />
