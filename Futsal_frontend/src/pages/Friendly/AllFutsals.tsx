@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { MapPin, Phone } from "lucide-react";
 import { API_BASE_URL } from "../../utils/api";
-import placeholder from "../../assets/home.png";
+import defaultImage from "../../assets/home.png"; // ✅ default image
 import Footer from "../../components/FooterIN";
 import Header from "../../components/header";
 
@@ -44,7 +44,6 @@ export default function AllFutsals() {
   );
 
   const handleBookNow = (futsalId: number) => {
-    // Navigate to InviteTeam page with selected futsal ID as query param
     navigate(`/invite-team?futsal=${futsalId}`);
   };
 
@@ -83,11 +82,20 @@ export default function AllFutsals() {
                 key={futsal.id}
                 className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition transform hover:-translate-y-2 duration-300 overflow-hidden border border-gray-100"
               >
-                {/* Image */}
+                {/* Image with default fallback */}
                 <img
-                  src={futsal.image || placeholder}
+                  src={
+                    futsal.image && futsal.image.trim() !== ""
+                      ? futsal.image.startsWith("http")
+                        ? futsal.image
+                        : `http://127.0.0.1:8000${futsal.image}`
+                      : defaultImage
+                  }
                   alt={futsal.name}
                   className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = defaultImage;
+                  }}
                 />
 
                 {/* Card Content */}

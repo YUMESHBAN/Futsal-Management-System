@@ -85,16 +85,20 @@ export default function CreateTeam() {
     setPlayers(updated);
   };
 
-  // Handle checkbox toggle for preferred futsals
   const togglePreferredFutsal = (id: number) => {
     setTeamData((prev) => {
       const alreadySelected = prev.preferred_futsal_ids.includes(id);
       let newSelected;
+
       if (alreadySelected) {
+        // remove if already selected
         newSelected = prev.preferred_futsal_ids.filter((fId) => fId !== id);
       } else {
+        // enforce maximum 5
+        if (prev.preferred_futsal_ids.length >= 5) return prev;
         newSelected = [...prev.preferred_futsal_ids, id];
       }
+
       return { ...prev, preferred_futsal_ids: newSelected };
     });
   };
@@ -116,8 +120,9 @@ export default function CreateTeam() {
     }
 
     // Validate preferred futsals
-    if (teamData.preferred_futsal_ids.length < 2) {
-      setErrors("Select at least 2 preferred futsals.");
+    if (teamData.preferred_futsal_ids.length !== 5) {
+      setErrors("You must select  5 preferred futsals.");
+      setTimeout(() => setErrors(null), 3000);
       return;
     }
 
@@ -145,7 +150,6 @@ export default function CreateTeam() {
       });
 
       alert("Team created successfully!");
-      // Optionally reset form or redirect here
 
       setLoading(false);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,7 +175,7 @@ export default function CreateTeam() {
           </h2>
 
           {errors && (
-            <div className="bg-red-100 text-red-700 border border-red-300 rounded-md p-3 mb-6 text-center font-semibold">
+            <div className="fixed top-5 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 ">
               {errors}
             </div>
           )}
@@ -249,7 +253,7 @@ export default function CreateTeam() {
               <label className="block font-semibold mb-2">
                 Preferred Futsals{" "}
                 <span className="text-sm text-gray-500">
-                  (Select at least 2)
+                  (Select 5 futsal that yor prefer to play in!!)
                 </span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
