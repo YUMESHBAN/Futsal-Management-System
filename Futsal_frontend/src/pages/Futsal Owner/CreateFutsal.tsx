@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL } from "../../utils/api";
-import Header from "../../components/header";
+import Header from "../../components/Header";
 import Footer from "../../components/FooterIN";
 
 export default function CreateFutsal() {
@@ -34,7 +34,7 @@ export default function CreateFutsal() {
           },
         }
       );
-      navigate("/futsals"); // Redirect after success
+      navigate("/my-futsal"); // Redirect after success
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       setError("Failed to create futsal.");

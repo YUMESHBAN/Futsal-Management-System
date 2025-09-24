@@ -102,91 +102,111 @@ export default function MyFutsals() {
   return (
     <div>
       <Header />
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-8">
-        {/* Header Section */}
+      <div className=" bg-gradient-to-br from-green-50 to-green-100 p-10">
+        {/* Page Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-extrabold text-green-600">
-            🏟️ My Futsals
+          <h1 className="text-3xl font-extrabold text-green-700 pt-5 ">
+            🏟️ My Futsal
           </h1>
-          <button
-            onClick={() => navigate("/create-futsal")}
-            className="bg-green-600 text-white px-5 py-2.5 rounded-lg shadow hover:bg-green-700 transition duration-300"
-          >
-            + Create Futsal
-          </button>
         </div>
 
         {/* Empty State */}
         {futsals.length === 0 ? (
-          <p className="text-gray-600 text-center text-lg bg-white py-6 rounded-lg shadow">
-            No futsals found. 🚫
-          </p>
-        ) : (
-          /* Futsals Grid (Players-style) */
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {futsals.map((futsal) => (
-              <div
-                key={futsal.id}
-                className="border rounded-xl p-5 bg-gray-50 shadow hover:shadow-md transition text-center relative"
+          /* Empty State */
+          <div className="flex justify-center items-center">
+            <div className="bg-white px-10 py-12 rounded-2xl shadow-lg text-center max-w-md">
+              <div className="text-5xl mb-4">🚫</div>
+              <h2 className="text-2xl font-bold text-gray-700 mb-2">
+                No futsal found
+              </h2>
+              <p className="text-gray-500 mb-6">
+                You haven’t created a futsal yet. Start by adding your venue so
+                players can discover and book it.
+              </p>
+              <button
+                onClick={() => navigate("/create-futsal")}
+                className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-green-700 transition duration-300"
               >
-                {/* Futsal Image Upload */}
-                <label htmlFor={`futsal-photo-${futsal.id}`}>
-                  <img
-                    src={
-                      futsal.image
-                        ? futsal.image.startsWith("http")
-                          ? futsal.image
-                          : `http://127.0.0.1:8000${futsal.image}`
-                        : defaultImage
-                    }
-                    alt={futsal.name}
-                    className="w-40 h-40 mx-auto rounded-lg object-cover mb-3 cursor-pointer hover:opacity-80 border-2 border-gray-200"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = defaultImage;
-                    }}
-                  />
-                </label>
+                + Create My Futsal
+              </button>
+            </div>
+          </div>
+        ) : (
+          futsals.map((futsal) => (
+            <div
+              key={futsal.id}
+              className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden mb-10"
+            >
+              {/* Hero Image */}
+              <div className="relative h-80 md:h-96 lg:h-[450px] overflow-hidden">
+                <img
+                  src={
+                    futsal.image?.startsWith("http")
+                      ? futsal.image
+                      : // eslint-disable-next-line no-constant-binary-expression
+                        `http://127.0.0.1:8000${futsal.image}` || defaultImage
+                  }
+                  alt={futsal.name}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) =>
+                    ((e.target as HTMLImageElement).src = defaultImage)
+                  }
+                />
+                <div className="absolute inset-0 bg-black/20"></div>
+
+                {/* Text Overlay */}
+                <div className="absolute bottom-8 left-8 z-10">
+                  <h1 className="text-4xl md:text-5xl font-extrabold text-green-400 drop-shadow-lg">
+                    {futsal.name}
+                  </h1>
+                  <p className="mt-3 text-lg text-gray-100 max-w-lg drop-shadow-md">
+                    {futsal.description}
+                  </p>
+                </div>
+
+                {/* Hidden file input on top for click */}
                 <input
                   type="file"
                   id={`futsal-photo-${futsal.id}`}
-                  className="hidden"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   accept="image/*"
                   onChange={(e) => handlePhotoChange(futsal.id, e)}
                 />
+              </div>
 
-                {/* Info */}
-                <h3 className="text-lg font-bold text-gray-800">
-                  {futsal.name}
-                </h3>
-                <p className="text-sm text-gray-600">📍 {futsal.location}</p>
-                <p className="text-sm text-gray-600">
-                  📞 {futsal.contact_number}
-                </p>
-                <p className="text-sm text-gray-600 mb-2">
-                  💰 Rs. {futsal.price_per_hour}/hr
-                </p>
-                <p className="text-gray-500 text-sm mb-4">
-                  {futsal.description}
-                </p>
-
-                {/* Actions */}
-                <div className="flex justify-center gap-4 mt-3">
-                  <button
-                    className="text-green-600 text-sm hover:underline"
-                    onClick={() => navigate(`/edit-futsal/${futsal.id}`)}
-                  >
-                    ✏️ Edit
-                  </button>
-                  <button
-                    className="text-red-600 text-sm hover:underline"
-                    onClick={() => handleDelete(futsal.id)}
-                  >
-                    🗑️ Delete
-                  </button>
+              {/* Details Section */}
+              <div className="p-8 space-y-4 text-gray-700 text-base">
+                <div className="flex items-center gap-2">
+                  📍 <span>{futsal.location}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  📞 <span>{futsal.contact_number}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  💰{" "}
+                  <span className="font-semibold">
+                    Rs. {futsal.price_per_hour}/hr
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* Actions */}
+              <div className="flex justify-center gap-6 pb-8">
+                <button
+                  className="px-6 py-2.5 rounded-lg bg-green-600 text-white font-semibold shadow hover:bg-green-700 hover:shadow-md transition"
+                  onClick={() => navigate(`/edit-futsal/${futsal.id}`)}
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  className="px-6 py-2.5 rounded-lg bg-red-500 text-white font-semibold shadow hover:bg-red-600 hover:shadow-md transition"
+                  onClick={() => handleDelete(futsal.id)}
+                >
+                  🗑️ Delete
+                </button>
+              </div>
+            </div>
+          ))
         )}
       </div>
       <Footer />

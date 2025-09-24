@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Footer from "../../components/FooterIN";
-import Header from "../../components/header";
+import Header from "../../components/Header";
 
 interface Futsal {
   id: number;
@@ -19,13 +20,14 @@ interface TeamData {
   name: string;
   location: string;
   skill_level: string;
-  futsal_id: number | null;
-  preferred_futsal_ids: number[];
+  futsal_id: number | null; // Home futsal
+  preferred_futsal_ids: number[]; // Remaining 4 futsals
 }
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 export default function CreateTeam() {
+  const navigate = useNavigate();
   const [teamData, setTeamData] = useState<TeamData>({
     name: "",
     location: "",
@@ -58,55 +60,44 @@ export default function CreateTeam() {
   const handlePlayerChange = (
     index: number,
     field: keyof Player,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     value: any
   ) => {
     const updated = [...players];
-
-    if (field === "age") {
-      updated[index].age = parseInt(value) || 0;
-    } else if (field === "name") {
-      updated[index].name = value;
-    }
-
+    if (field === "age") updated[index].age = parseInt(value) || 0;
+    else if (field === "name") updated[index].name = value;
     setPlayers(updated);
   };
 
-  // Add new player
-  const addPlayer = () => {
-    setPlayers([...players, { name: "", age: 0 }]);
-  };
-
-  // Remove player by index
+  const addPlayer = () => setPlayers([...players, { name: "", age: 0 }]);
   const removePlayer = (index: number) => {
-    if (players.length <= 2) return; // minimum 2 players required
+    if (players.length <= 2) return;
     const updated = [...players];
     updated.splice(index, 1);
     setPlayers(updated);
   };
 
+  // Toggle preferred futsals (max 4, home futsal is always priority #1)
   const togglePreferredFutsal = (id: number) => {
     setTeamData((prev) => {
-      const alreadySelected = prev.preferred_futsal_ids.includes(id);
-      let newSelected;
+      if (id === prev.futsal_id) return prev; // can't re-select home futsal
 
-      if (alreadySelected) {
-        // remove if already selected
-        newSelected = prev.preferred_futsal_ids.filter((fId) => fId !== id);
-      } else {
-        // enforce maximum 5
-        if (prev.preferred_futsal_ids.length >= 5) return prev;
-        newSelected = [...prev.preferred_futsal_ids, id];
+      let updated = [...prev.preferred_futsal_ids];
+      if (updated.includes(id)) updated = updated.filter((f) => f !== id);
+      else {
+        if (updated.length >= 4) {
+          alert(
+            "❌ You can only select 4 additional preferred futsals besides home futsal."
+          );
+          return prev;
+        }
+        updated.push(id);
       }
-
-      return { ...prev, preferred_futsal_ids: newSelected };
+      return { ...prev, preferred_futsal_ids: updated };
     });
   };
 
-  // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setErrors(null);
 
     // Validate players
@@ -120,9 +111,14 @@ export default function CreateTeam() {
     }
 
     // Validate preferred futsals
-    if (teamData.preferred_futsal_ids.length !== 5) {
-      setErrors("You must select  5 preferred futsals.");
-      setTimeout(() => setErrors(null), 3000);
+    if (!teamData.futsal_id) {
+      setErrors("Please select a home futsal.");
+      return;
+    }
+    if (teamData.preferred_futsal_ids.length !== 4) {
+      setErrors(
+        "You must select exactly 4 additional preferred futsals (home futsal is priority #1)."
+      );
       return;
     }
 
@@ -130,8 +126,10 @@ export default function CreateTeam() {
 
     const payload = {
       ...teamData,
-      futsal_id: teamData.futsal_id, // null allowed for optional
-      preferred_futsal_ids: teamData.preferred_futsal_ids,
+      preferred_futsal_ids: [
+        teamData.futsal_id,
+        ...teamData.preferred_futsal_ids,
+      ],
       players,
     };
 
@@ -143,16 +141,13 @@ export default function CreateTeam() {
         return;
       }
 
-      const response = await axios.post(`${API_BASE_URL}/teams/`, payload, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
+      await axios.post(`${API_BASE_URL}/teams/`, payload, {
+        headers: { Authorization: `Token ${token}` },
       });
 
       alert("Team created successfully!");
-
       setLoading(false);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      navigate("/my-team");
     } catch (error: any) {
       console.error(
         "❌ Team creation failed:",
@@ -165,6 +160,7 @@ export default function CreateTeam() {
       setLoading(false);
     }
   };
+
   return (
     <div>
       <Header />
@@ -226,9 +222,7 @@ export default function CreateTeam() {
 
             {/* Home futsal */}
             <div>
-              <label className="block font-semibold mb-1">
-                Home Futsal (Optional)
-              </label>
+              <label className="block font-semibold mb-1">Home Futsal</label>
               <select
                 value={teamData.futsal_id ?? ""}
                 onChange={(e) =>
@@ -253,14 +247,18 @@ export default function CreateTeam() {
               <label className="block font-semibold mb-2">
                 Preferred Futsals{" "}
                 <span className="text-sm text-gray-500">
-                  (Select 5 futsal that yor prefer to play in!!)
+                  (Select 4 additional futsals besides home)
                 </span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {futsals.map((futsal) => (
                   <label
                     key={futsal.id}
-                    className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className={`flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer ${
+                      futsal.id === teamData.futsal_id
+                        ? "bg-green-100 border-green-400"
+                        : ""
+                    }`}
                   >
                     <input
                       type="checkbox"
@@ -268,14 +266,47 @@ export default function CreateTeam() {
                         futsal.id
                       )}
                       onChange={() => togglePreferredFutsal(futsal.id)}
+                      disabled={futsal.id === teamData.futsal_id} // can't toggle home futsal
                       className="h-4 w-4"
                     />
                     <span>
                       {futsal.name} - {futsal.location}
+                      {futsal.id === teamData.futsal_id
+                        ? " (Home / Priority #1)"
+                        : ""}
                     </span>
                   </label>
                 ))}
               </div>
+
+              {/* Display ordered futsals */}
+              {teamData.futsal_id && (
+                <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm font-semibold text-green-700 mb-1">
+                    Selected Futsals (Priority Order)
+                  </p>
+                  <ol className="list-decimal list-inside text-green-900 text-sm">
+                    {(() => {
+                      const homeFutsal = futsals.find(
+                        (f) => f.id === teamData.futsal_id
+                      );
+                      return homeFutsal ? (
+                        <li key={homeFutsal.id}>
+                          {homeFutsal.name} - {homeFutsal.location}
+                        </li>
+                      ) : null;
+                    })()}
+                    {teamData.preferred_futsal_ids.map((id) => {
+                      const futsal = futsals.find((f) => f.id === id);
+                      return (
+                        <li key={id}>
+                          {futsal?.name} - {futsal?.location}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              )}
             </div>
 
             {/* Players */}
@@ -322,7 +353,6 @@ export default function CreateTeam() {
                   )}
                 </div>
               ))}
-
               <button
                 type="button"
                 onClick={addPlayer}
