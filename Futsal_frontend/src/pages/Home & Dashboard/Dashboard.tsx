@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import Footer from "../../components/FooterIN";
-import Header from "../../components/header";
+import Header from "../../components/Header";
 
 // Define interface for DashboardCard props
 interface DashboardCardProps {
@@ -16,8 +17,9 @@ export default function Dashboard() {
   const [username, setUsername] = useState("");
   const [userType, setUserType] = useState("");
   const [loading, setLoading] = useState(true);
+  const [hasFutsal, setHasFutsal] = useState(false);
+  const [hasTeam, setHasTeam] = useState(false);
   const navigate = useNavigate();
-
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user_type = localStorage.getItem("user_type");
@@ -25,10 +27,36 @@ export default function Dashboard() {
 
     if (!token) {
       navigate("/login");
-    } else {
-      setUsername(user_name || "");
-      setUserType(user_type || "");
-      setLoading(false);
+      return;
+    }
+
+    setUsername(user_name || "");
+    setUserType(user_type || "");
+
+    if (user_type === "owner") {
+      axios
+        .get("http://127.0.0.1:8000/api/my-futsals/", {
+          headers: { Authorization: `Token ${token}` },
+        })
+        .then((res) => setHasFutsal(res.data && res.data.length > 0))
+        .catch(() => setHasFutsal(false))
+        .finally(() => setLoading(false));
+    }
+
+    if (user_type === "player") {
+      axios
+        .get("http://127.0.0.1:8000/api/my-team/", {
+          headers: { Authorization: `Token ${token}` },
+        })
+        .then((res) => {
+          if (res.data && Object.keys(res.data).length > 0) {
+            setHasTeam(true);
+          } else {
+            setHasTeam(false);
+          }
+        })
+        .catch(() => setHasTeam(false))
+        .finally(() => setLoading(false));
     }
   }, [navigate]);
 
@@ -64,23 +92,26 @@ export default function Dashboard() {
 
           {/* Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Owner Dashboard */}
             {userType === "owner" ? (
               <>
-                <DashboardCard
-                  title="Create Futsal"
-                  description="Add a new futsal venue to your portfolio"
-                  icon="🏟️"
-                  onClick={() => navigate("/create-futsal")}
-                  color="from-blue-500 to-blue-600"
-                />
-                <DashboardCard
-                  title="View My Futsals"
-                  description="Manage your existing futsal venues"
-                  icon="👀"
-                  onClick={() => navigate("/my-futsal")}
-                  color="from-green-500 to-green-600"
-                />
+                {!hasFutsal ? (
+                  <DashboardCard
+                    title="Create Futsal"
+                    description="Add a new futsal venue to your portfolio"
+                    icon="🏟️"
+                    onClick={() => navigate("/create-futsal")}
+                    color="from-blue-500 to-blue-600"
+                  />
+                ) : (
+                  <DashboardCard
+                    title="View My Futsal"
+                    description="Manage your existing futsal venues"
+                    icon="👀"
+                    onClick={() => navigate("/my-futsal")}
+                    color="from-green-500 to-green-600"
+                  />
+                )}
+
                 <DashboardCard
                   title="Generate Time Slots"
                   description="Create available time slots for bookings"
@@ -118,28 +149,32 @@ export default function Dashboard() {
                 />
               </>
             ) : (
-              /* Player Dashboard */
               <>
+                {/* Player Dashboard */}
+                {!hasTeam ? (
+                  <DashboardCard
+                    title="Create My Team"
+                    description="Form your own futsal team"
+                    icon="👥"
+                    onClick={() => navigate("/create-team")}
+                    color="from-purple-500 to-purple-600"
+                  />
+                ) : (
+                  <DashboardCard
+                    title="View My Team"
+                    description="Manage your team details and members"
+                    icon="ℹ️"
+                    onClick={() => navigate("/my-team")}
+                    color="from-indigo-500 to-indigo-600"
+                  />
+                )}
+
                 <DashboardCard
                   title="View All Futsals"
                   description="Browse all available futsal venues"
                   icon="🔍"
                   onClick={() => navigate("/all-futsals")}
                   color="from-green-500 to-green-600"
-                />
-                <DashboardCard
-                  title="Create My Team"
-                  description="Form your own futsal team"
-                  icon="👥"
-                  onClick={() => navigate("/create-team")}
-                  color="from-purple-500 to-purple-600"
-                />
-                <DashboardCard
-                  title="View My Team"
-                  description="Manage your team details and members"
-                  icon="ℹ️"
-                  onClick={() => navigate("/my-team")}
-                  color="from-indigo-500 to-indigo-600"
                 />
                 <DashboardCard
                   title="Invite Team for Match"
