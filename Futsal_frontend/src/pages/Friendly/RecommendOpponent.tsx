@@ -23,10 +23,8 @@ export default function RecommendOpponent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
   const navigate = useNavigate();
 
-  // Fetch recommendations
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -62,24 +60,12 @@ export default function RecommendOpponent() {
         {},
         { headers: { Authorization: `Token ${token}` } }
       );
-
-      setInviteMessage(`✅ Invitation sent to team: ${teamName}`);
-
-      // Navigate to competitive center after short delay
+      setInviteMessage(`✅ Invitation sent to team : ${teamName}`);
       setTimeout(() => {
         navigate("/competitive-center");
       }, 1000);
-    } catch (error: any) {
-      // Show error message
-      setInviteMessage(
-        `❌ Failed to send invitation.  ${teamName} rejected your invitation previously.`
-      );
-
-      // Automatically move to next recommended team
-      setActiveIndex((prev) => {
-        const nextIndex = prev + 1;
-        return nextIndex < recommendations.length ? nextIndex : prev;
-      });
+    } catch {
+      setInviteMessage(`❌ Failed to send invitation to team : ${teamName}`);
     }
   };
 
@@ -128,12 +114,10 @@ export default function RecommendOpponent() {
 
           {/* Recommendation Cards */}
           <div className="space-y-6">
-            {recommendations.map((team, index) => (
+            {recommendations.slice(0, 5).map((team, index) => (
               <div
                 key={team.team_id}
-                className={`bg-gray-900/90 p-5 rounded-xl shadow-lg border border-green-700 ${
-                  index === activeIndex ? "opacity-100" : "opacity-60"
-                }`}
+                className="bg-gray-900/90 p-5 rounded-xl shadow-lg border border-green-700"
               >
                 {/* Team Info */}
                 <h2 className="text-2xl font-semibold mb-2">
@@ -160,7 +144,7 @@ export default function RecommendOpponent() {
                   </p>
                   <p className="col-span-2 md:col-span-3">
                     <span className="text-gray-400">Preferred Futsals:</span>{" "}
-                    {team.preferred_futsals?.length
+                    {team.preferred_futsals.length > 0
                       ? team.preferred_futsals.join(", ")
                       : "N/A"}
                   </p>
@@ -182,8 +166,8 @@ export default function RecommendOpponent() {
                   </p>
                 </div>
 
-                {/* Invitation Button */}
-                {index === activeIndex && (
+                {/* Invitation Button (only for first team) */}
+                {index === 0 && (
                   <button
                     onClick={() =>
                       handleSendInvitation(team.team_id, team.team_name)
