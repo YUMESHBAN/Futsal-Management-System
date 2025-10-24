@@ -143,7 +143,7 @@ def send_match_payment_email(to_emails, match):
 
     message = (
         f"Hello,\n\n"
-        f"You have payment due for {match.match_type} match.\n"
+        f"You have payemnt due for {match.match_type} match.\n"
         f"Completed Time: {match.scheduled_time}\n"
         f"Venue: {futsal_name}\n\n"
         f"Use this link for esewa payment  https://esewa.com.np/#/home "

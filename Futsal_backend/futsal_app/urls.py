@@ -35,6 +35,9 @@ from .views import (
     SendMatchRequestView,
     RespondMatchRequestView,
 
+    #Contact Us
+    contact_message
+
 
 )
 
@@ -82,6 +85,8 @@ urlpatterns = [
     path("owner/competitive-matches/", views.owner_competitive_matches),
     path('competitive/leaderboard/', views.competitive_leaderboard),
 
+
+   path('contact/', contact_message, name='contact-message'),
    
 
 ]

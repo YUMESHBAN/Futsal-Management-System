@@ -27,7 +27,7 @@ def opponent_stats(team_id, opponent_id, matches):
     if not games:
         return [0, 0.0, 0.0]
 
-    played = 1
+    played = len(games)
     wins = 0
     goal_diff = 0
 

@@ -1,5 +1,5 @@
 from rest_framework import viewsets, generics, permissions, status, serializers
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
@@ -13,6 +13,8 @@ from rest_framework.decorators import api_view,permission_classes
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from datetime import datetime, timedelta
+from django.core.mail import send_mail
+from django.conf import settings
 import uuid
 
 
@@ -348,7 +350,7 @@ class UpdateMatchResultView(APIView):
         elif team_2_score > team_1_score:
             result = "team_2"
         else:
-            result = "draw"
+            result = "Draw"
 
         # Fetch or create payment
         payment, _ = Payment.objects.get_or_create(
@@ -620,9 +622,6 @@ class RespondMatchRequestView(APIView):
         return Response({"detail": "Invalid action."}, status=400)
 
 
-
-
-
 # ---------- Competitive Match Views ----------
 
 
@@ -783,20 +782,19 @@ def schedule_match(request, match_id):
     # ✅ Determine opponent team
     opponent_team = match.team_2 if team == match.team_1 else match.team_1
 
-    # ✅ Compare preferred futsals
-    preferred_futsals = set(team.preferred_futsals.values_list('id', flat=True))
+    
+    # ✅ Preserve order: iterate over requester's preferred futsals in saved order
+    preferred_futsals = list(team.preferred_futsals.all())
     opponent_futsals = set(opponent_team.preferred_futsals.values_list('id', flat=True))
 
-    common_futsals = preferred_futsals.intersection(opponent_futsals)
+    common_futsal = next((f for f in preferred_futsals if f.id in opponent_futsals), None)
 
-    # ✅ Choose futsal
-    if common_futsals:
-        futsal_id = list(common_futsals)[0]
-        futsal = Futsal.objects.get(id=futsal_id)
+    if common_futsal:
+       futsal = common_futsal
     else:
         futsal = team.futsal
         if not futsal:
-            return Response({"error": "Your team has no assigned futsal."}, status=400)
+           return Response({"error": "Your team has no assigned futsal."}, status=400)
 
     # ✅ Finalize scheduling
     match.scheduled_date = date_obj
@@ -810,6 +808,7 @@ def schedule_match(request, match_id):
         "date": date_str,
         "futsal": futsal.name
     }, status=200)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -836,17 +835,15 @@ def owner_competitive_matches(request):
 
     return Response(data)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def finalize_match(request):
     match_id = request.data.get('match_id')
-    winner_id = request.data.get('winner_id')
     goals_team_1 = request.data.get('goals_team_1')
     goals_team_2 = request.data.get('goals_team_2')
 
     # Validate input
-    if not all([match_id, winner_id, goals_team_1 is not None, goals_team_2 is not None]):
+    if not all([match_id, goals_team_1 is not None, goals_team_2 is not None]):
         return Response({'error': 'Missing required fields.'}, status=400)
 
     try:
@@ -867,15 +864,15 @@ def finalize_match(request):
     if match.futsal.owner != request.user:
         return Response({'error': 'Only the futsal owner can finalize the match.'}, status=403)
 
-    try:
-        winner_team = Team.objects.get(id=winner_id)
-    except Team.DoesNotExist:
-        return Response({'error': 'Winner team not found.'}, status=404)
+    # Determine winner automatically
+    if goals_team_1 > goals_team_2:
+        winner_team = match.team_1
+    elif goals_team_2 > goals_team_1:
+        winner_team = match.team_2
+    else:
+        winner_team = None  # Draw
 
-    if winner_team not in [match.team_1, match.team_2]:
-        return Response({'error': 'Winner must be one of the participating teams.'}, status=400)
-
-    # ✅ Save match results
+    # Save match results
     match.winner = winner_team
     match.goals_team_1 = goals_team_1
     match.goals_team_2 = goals_team_2
@@ -883,7 +880,7 @@ def finalize_match(request):
     match.is_completed = True
     match.save()
 
-    # ✅ Call elo update with saved goals
+    # Update ELO (update_elo should handle winner_team=None for draw)
     result = update_elo(
         team_a=match.team_1,
         team_b=match.team_2,
@@ -913,3 +910,29 @@ def competitive_leaderboard(request):
         for team in teams
     ]
     return Response(data)
+
+# ---------- Contact Us ----------
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  
+def contact_message(request):
+    name = request.data.get('name')
+    email = request.data.get('email')
+    subject = request.data.get('subject')
+    message = request.data.get('message')
+
+    if not all([name, email, subject, message]):
+        return Response({"error": "All fields are required."}, status=400)
+
+    try:
+        send_mail(
+            subject=f"[HamroFutsal Contact] {subject}",
+            message=f"From: {name} <{email}>\n\n{message}",
+            from_email=settings.DEFAULT_FROM_EMAIL,  # must be configured in settings.py
+            recipient_list=[settings.CONTACT_RECIPIENT_EMAIL],  # your email
+            fail_silently=False,
+        )
+        return Response({"success": "Message sent successfully!"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
