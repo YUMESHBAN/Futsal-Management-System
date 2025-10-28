@@ -225,6 +225,23 @@ class MatchRequest(models.Model):
         return f"Request: {self.team_a.name} ➝ {self.team_b.name} [{self.status}]"
 
 
+# Invitation Model fo Competitive
+class RejectedInvitation(models.Model):
+    requester = models.ForeignKey(Team, related_name="sent_rejections", on_delete=models.CASCADE)
+    rejector = models.ForeignKey(Team, related_name="received_rejections", on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class TeamRejection(models.Model):
+    rejecting_team = models.ForeignKey(Team, related_name="rejected_by", on_delete=models.CASCADE)
+    rejected_team = models.ForeignKey(Team, related_name="rejected_team", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    cleared = models.BooleanField(default=False)
+    
+
+    class Meta:
+        unique_together = ('rejecting_team', 'rejected_team')
+
+
 # Payment Model
 class Payment(models.Model):
     PAYMENT_METHODS = [

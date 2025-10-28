@@ -15,7 +15,8 @@ from django.http import HttpResponse
 from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.conf import settings
-import uuid
+from django.utils import timezone
+
 
 
 from utils.email_service import (
@@ -28,7 +29,7 @@ from utils.email_service import (
 )
 
 
-from .models import Futsal, Team, Player, TeamMatch,TimeSlot,Payment,MatchRequest,Match
+from .models import Futsal, Team, Player, TeamMatch,TimeSlot,Payment,MatchRequest,Match, TeamRejection
 from .serializers import (
     FutsalSerializer,
     TeamSerializer,
@@ -622,17 +623,24 @@ class RespondMatchRequestView(APIView):
         return Response({"detail": "Invalid action."}, status=400)
 
 
-# ---------- Competitive Match Views ----------
+# ----------------- Constants -----------------
+COOLDOWN_DAYS = 1  # Number of days a rejection blocks invites
 
 
-
+# ----------------- Recommendation View -----------------
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def recommend_competitive_match(request):
     user_team = Team.objects.filter(owner=request.user).first()
-
     if not user_team:
         return Response({"error": "No team found."}, status=400)
+
+    # Optional: clear expired rejections before recommending
+    now = timezone.now()
+    TeamRejection.objects.filter(
+        cleared=False,
+        timestamp__lte=now - timedelta(days=COOLDOWN_DAYS)
+    ).update(cleared=True)
 
     cf = recommend_by_collab(user_team.id, top_n=10)
     cb = recommend_by_content(user_team, top_n=10)
@@ -640,8 +648,17 @@ def recommend_competitive_match(request):
 
     response = []
     for team_id, score in hybrid:
+        if team_id == user_team.id:
+            continue
         try:
             t = Team.objects.get(id=team_id)
+
+            recently_rejected = TeamRejection.objects.filter(
+                rejecting_team=t,
+                rejected_team=user_team,
+                cleared=False
+            ).exists()  # Only consider uncleared rejections
+
             response.append({
                 "team_id": t.id,
                 "team_name": t.name,
@@ -649,7 +666,8 @@ def recommend_competitive_match(request):
                 "win_rate": t.win_rate,
                 "weighted_score": t.weighted_score,
                 "preferred_futsals": [f.name for f in t.preferred_futsals.all()],
-                "similarity_score": round(score, 3)
+                "similarity_score": round(score, 3),
+                "recently_rejected": recently_rejected
             })
         except Team.DoesNotExist:
             continue
@@ -660,8 +678,9 @@ def recommend_competitive_match(request):
     })
 
 
+# ----------------- Send Match Request -----------------
 @api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def send_match_request(request, team_id):
     sender = Team.objects.filter(owner=request.user).first()
     if not sender:
@@ -672,24 +691,94 @@ def send_match_request(request, team_id):
     except Team.DoesNotExist:
         return Response({"error": "Opponent not found."}, status=404)
 
+    # ✅ Clear old rejections that exceeded COOLDOWN_DAYS
+    TeamRejection.objects.filter(
+        cleared=False,
+        timestamp__lte=timezone.now() - timedelta(days=COOLDOWN_DAYS)
+    ).update(cleared=True)
+
+    # Check if receiver has recently rejected sender
+    if TeamRejection.objects.filter(
+        rejecting_team=receiver,
+        rejected_team=sender,
+        cleared=False
+    ).exists():
+        return Response(
+            {"error": f"You cannot send a request to {receiver.name} yet."},
+            status=400
+        )
+
+    # Check for existing pending match
     if Match.objects.filter(
-        Q(team_1=sender, team_2=receiver, is_completed=False) |
-        Q(team_1=receiver, team_2=sender, is_completed=False)
+        Q(team_1=sender, team_2=receiver, status='pending') |
+        Q(team_1=receiver, team_2=sender, status='pending')
     ).exists():
         return Response({"error": "Existing match found."}, status=409)
 
     match = Match.objects.create(
-    team_1=sender,
-    team_2=receiver,
-    match_type='competitive',
-    status='pending',
-    accepted=None  # Optional, but good for clarity
-)
+        team_1=sender,
+        team_2=receiver,
+        match_type='competitive',
+        status='pending',
+        accepted=None
+    )
 
     return Response({"message": "Match request sent.", "match_id": match.id}, status=201)
 
 
+# ----------------- Respond to Match Request -----------------
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def respond_to_match_request(request, match_id):
+    decision = request.data.get("decision")
+    if decision not in ['accept', 'reject']:
+        return Response({"error": "Invalid decision."}, status=400)
 
+    try:
+        match = Match.objects.get(id=match_id)
+    except Match.DoesNotExist:
+        return Response({"error": "Match not found."}, status=404)
+
+    # Only the receiving team can respond
+    if match.team_2.owner != request.user:
+        return Response({"error": "Unauthorized."}, status=403)
+
+    if decision == 'accept':
+        match.status = 'confirmed'
+        match.accepted = True
+        match.save()
+        return Response({"message": "Match accepted successfully."})
+
+    # ❌ Handle rejection
+    match.status = 'rejected'
+    match.accepted = False
+    match.save()
+
+    # ✅ Record rejection
+    TeamRejection.objects.update_or_create(
+        rejecting_team=match.team_2,
+        rejected_team=match.team_1,
+        defaults={"cleared": False, "timestamp": timezone.now()}
+    )
+
+    # ✅ Optional: Clear expired rejections for sender
+    TeamRejection.objects.filter(
+        rejected_team=match.team_1,
+        cleared=False,
+        timestamp__lte=timezone.now() - timedelta(days=COOLDOWN_DAYS)
+    ).update(cleared=True)
+
+    # Get alternative recommended teams excluding rejected
+    alternatives = get_alternative_teams(match.team_1, exclude_team=match.team_2.id)
+
+    return Response({
+        "message": "Match request rejected.",
+        "alternatives": alternatives
+    })
+
+
+
+# ---------- List Competitive Matches ----------
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_competitive_matches(request):
@@ -714,46 +803,94 @@ def list_competitive_matches(request):
             "match_type": match.match_type,
             "scheduled_time": match.scheduled_date,
             "status": match.status,
-            "accepted": match.accepted,  # ✅ Add this
+            "accepted": match.accepted,
             "created_at": match.created_at,
-            "futsal_name": match.futsal.name if match.futsal else None 
+            "futsal_name": match.futsal.name if match.futsal else None
         })
 
     return Response(data)
 
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def respond_to_match_request(request, match_id):
-    decision = request.data.get("decision")
-    if decision not in ['accept', 'reject']:
-        return Response({"error": "Invalid decision."}, status=400)
 
-    try:
-        match = Match.objects.get(id=match_id)
-    except Match.DoesNotExist:
-        return Response({"error": "Match not found."}, status=404)
-
-    if match.team_2.owner != request.user:
-        return Response({"error": "Unauthorized."}, status=403)
-
-    if decision == 'accept':
-        match.status = 'confirmed'
-        match.accepted = True  # ✅ Add this
-        match.save()
-        return Response({"message": "Accepted."})
-
-    # If rejected
-    match.accepted = False  # ✅ Add this
-    match.status = 'pending'  # Optional: or keep as 'pending'
+# ----------------- Complete Match -----------------
+def mark_match_completed(match_id):
+    match = Match.objects.get(id=match_id)
+    match.is_completed = True
+    match.status = 'completed'
     match.save()
-    return Response({"message": "Rejected."})
 
+    # Clear old rejections for both teams
+    clear_rejections_after_match(match)
+
+
+def clear_rejections_after_match(match: Match):
+    """
+    Clears all previous rejections for both teams involved in a completed competitive match.
+    """
+    TeamRejection.objects.filter(
+        Q(rejected_team=match.team_1) | Q(rejecting_team=match.team_1) |
+        Q(rejected_team=match.team_2) | Q(rejecting_team=match.team_2),
+        cleared=False
+    ).update(cleared=True)
+
+
+
+# ----------------- Alternative Teams -----------------
+def get_alternative_teams(team, exclude_team=None):
+    cf = recommend_by_collab(team.id, top_n=10)
+    cb = recommend_by_content(team, top_n=10)
+    hybrid = merge_recommendations(cf, cb)
+
+    response = []
+    for team_id, score in hybrid:
+        if team_id == team.id:
+            continue
+        if exclude_team and team_id == exclude_team:
+            continue
+        try:
+            t = Team.objects.get(id=team_id)
+
+            recently_rejected = TeamRejection.objects.filter(
+                rejecting_team=t,
+                rejected_team=team,
+                cleared=False,
+                timestamp__gte=timezone.now() - timedelta(days=COOLDOWN_DAYS)
+            ).exists()
+
+            response.append({
+                "team_id": t.id,
+                "team_name": t.name,
+                "elo_rating": t.ranking,
+                "win_rate": t.win_rate,
+                "weighted_score": t.weighted_score,
+                "preferred_futsals": [f.name for f in t.preferred_futsals.all()],
+                "similarity_score": round(score, 3),
+                "recently_rejected": recently_rejected
+            })
+        except Team.DoesNotExist:
+            continue
+
+    return response
+
+# ---------- Invitation Status ----------
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def invitation_status(request, team_id):
+    user_team = Team.objects.filter(owner=request.user).first()
+    opponent_team = Team.objects.get(id=team_id)
+    match_request = MatchRequest.objects.filter(
+        team_1=user_team, team_2=opponent_team
+    ).first()
+    if not match_request:
+        return Response({"status": "none"})
+    return Response({"status": match_request.status})
+
+
+# ---------- Schedule Match ----------
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def schedule_match(request, match_id):
     date_str = request.data.get("scheduled_date")
 
-    # ✅ Validate date format
     try:
         date_obj = date.fromisoformat(date_str)
     except ValueError:
@@ -762,7 +899,6 @@ def schedule_match(request, match_id):
     if date_obj < date.today():
         return Response({"error": "Cannot schedule match in the past."}, status=400)
 
-    # ✅ Get match
     try:
         match = Match.objects.get(id=match_id)
     except Match.DoesNotExist:
@@ -771,7 +907,6 @@ def schedule_match(request, match_id):
     if match.status != 'confirmed':
         return Response({"error": "Only confirmed matches can be scheduled."}, status=400)
 
-    # ✅ Get requesting user's team
     team = Team.objects.filter(owner=request.user).first()
     if not team:
         return Response({"error": "Your user is not linked to any team."}, status=400)
@@ -779,24 +914,20 @@ def schedule_match(request, match_id):
     if team not in [match.team_1, match.team_2]:
         return Response({"error": "You are not a participant in this match."}, status=403)
 
-    # ✅ Determine opponent team
     opponent_team = match.team_2 if team == match.team_1 else match.team_1
 
-    
-    # ✅ Preserve order: iterate over requester's preferred futsals in saved order
     preferred_futsals = list(team.preferred_futsals.all())
     opponent_futsals = set(opponent_team.preferred_futsals.values_list('id', flat=True))
 
     common_futsal = next((f for f in preferred_futsals if f.id in opponent_futsals), None)
 
     if common_futsal:
-       futsal = common_futsal
+        futsal = common_futsal
     else:
         futsal = team.futsal
         if not futsal:
-           return Response({"error": "Your team has no assigned futsal."}, status=400)
+            return Response({"error": "Your team has no assigned futsal."}, status=400)
 
-    # ✅ Finalize scheduling
     match.scheduled_date = date_obj
     match.futsal = futsal
     match.status = 'scheduled'
@@ -842,7 +973,6 @@ def finalize_match(request):
     goals_team_1 = request.data.get('goals_team_1')
     goals_team_2 = request.data.get('goals_team_2')
 
-    # Validate input
     if not all([match_id, goals_team_1 is not None, goals_team_2 is not None]):
         return Response({'error': 'Missing required fields.'}, status=400)
 
@@ -860,11 +990,10 @@ def finalize_match(request):
     if not match.futsal:
         return Response({'error': 'Match has no assigned futsal venue.'}, status=400)
 
-    # Ensure the requesting user is the futsal owner
     if match.futsal.owner != request.user:
         return Response({'error': 'Only the futsal owner can finalize the match.'}, status=403)
 
-    # Determine winner automatically
+    # Determine winner
     if goals_team_1 > goals_team_2:
         winner_team = match.team_1
     elif goals_team_2 > goals_team_1:
@@ -880,7 +1009,10 @@ def finalize_match(request):
     match.is_completed = True
     match.save()
 
-    # Update ELO (update_elo should handle winner_team=None for draw)
+    # Clear previous rejections for both teams
+    clear_rejections_after_match(match)
+
+    # Update ELO ratings
     result = update_elo(
         team_a=match.team_1,
         team_b=match.team_2,
@@ -890,7 +1022,7 @@ def finalize_match(request):
     )
 
     return Response({
-        'message': 'Match finalized, goals saved, and ELO updated.',
+        'message': 'Match finalized, goals saved, ELO updated, and previous rejections cleared.',
         'elo_result': result
     }, status=200)
 
