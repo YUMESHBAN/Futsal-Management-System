@@ -14,17 +14,19 @@ interface TeamRecommendation {
   weighted_score: number;
   preferred_futsals: string[] | null;
   similarity_score: number;
+  recently_rejected: boolean;
+  status?: string; // NEW: for project clarity
 }
 
 export default function RecommendOpponent() {
-  const [recommendations, setRecommendations] = useState<TeamRecommendation[]>(
-    []
-  );
+  const [recommendations, setRecommendations] = useState<TeamRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const navigate = useNavigate();
 
+  // Fetch recommendations
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -38,7 +40,17 @@ export default function RecommendOpponent() {
         headers: { Authorization: `Token ${token}` },
       })
       .then((res) => {
-        setRecommendations(res.data.recommendations);
+        // Add a status field for clarity
+        const updated = res.data.recommendations.map((team: TeamRecommendation) => ({
+          ...team,
+          status: team.recently_rejected ? "❌ Recently Rejected" : "✅ Available",
+        }));
+        setRecommendations(updated);
+
+        // Automatically focus first available team
+        const firstAvailable = updated.findIndex(t => t.status === "✅ Available");
+        setActiveIndex(firstAvailable !== -1 ? firstAvailable : 0);
+
         setLoading(false);
       })
       .catch(() => {
@@ -47,25 +59,63 @@ export default function RecommendOpponent() {
       });
   }, []);
 
-  const handleSendInvitation = async (teamId: number, teamName: string) => {
+  // Handle sending invitation
+  const handleSendInvitation = async (team: TeamRecommendation) => {
     const token = localStorage.getItem("token");
     if (!token) {
       setInviteMessage("Unauthorized.");
       return;
     }
 
+    if (team.status !== "✅ Available") {
+      setInviteMessage(`❌ Cannot send invitation. ${team.team_name} is on cooldown.`);
+      // Move to next available recommendation
+      const nextIndex = recommendations.findIndex(
+        (t, idx) => idx > activeIndex && t.status === "✅ Available"
+      );
+      setActiveIndex(nextIndex !== -1 ? nextIndex : activeIndex);
+      return;
+    }
+
     try {
       await axios.post(
-        `${API_BASE_URL}/competitive/request/${teamId}/`,
+        `${API_BASE_URL}/competitive/request/${team.team_id}/`,
         {},
         { headers: { Authorization: `Token ${token}` } }
       );
-      setInviteMessage(`✅ Invitation sent to team : ${teamName}`);
+
+      setInviteMessage(`✅ Invitation sent to ${team.team_name}`);
+
+      // Move to next available team
+      const nextIndex = recommendations.findIndex(
+        (t, idx) => idx > activeIndex && t.status === "✅ Available"
+      );
+      setActiveIndex(nextIndex !== -1 ? nextIndex : activeIndex);
+
+      // Optionally navigate after short delay
       setTimeout(() => {
         navigate("/competitive-center");
       }, 1000);
-    } catch {
-      setInviteMessage(`❌ Failed to send invitation to team : ${teamName}`);
+    } catch (error: any) {
+      setInviteMessage(
+        error.response?.data?.error ||
+          `❌ Failed to send invitation. ${team.team_name} rejected you previously.`
+      );
+
+      // Update the status of this team to rejected
+      setRecommendations(prev =>
+        prev.map(t =>
+          t.team_id === team.team_id
+            ? { ...t, status: "❌ Recently Rejected" }
+            : t
+        )
+      );
+
+      // Move to next available team
+      const nextIndex = recommendations.findIndex(
+        (t, idx) => idx > activeIndex && t.status === "✅ Available"
+      );
+      setActiveIndex(nextIndex !== -1 ? nextIndex : activeIndex);
     }
   };
 
@@ -90,7 +140,7 @@ export default function RecommendOpponent() {
             </button>
           </div>
 
-          {/* Invite message */}
+          {/* Invite Message */}
           {inviteMessage && (
             <div className="mb-4 text-center font-semibold text-green-400">
               {inviteMessage}
@@ -114,51 +164,41 @@ export default function RecommendOpponent() {
 
           {/* Recommendation Cards */}
           <div className="space-y-6">
-            {recommendations.slice(0, 5).map((team, index) => (
+            {recommendations.map((team, index) => (
               <div
                 key={team.team_id}
-                className="bg-gray-900/90 p-5 rounded-xl shadow-lg border border-green-700"
+                className={`bg-gray-900/90 p-5 rounded-xl shadow-lg border border-green-700 ${
+                  index === activeIndex ? "opacity-100" : "opacity-60"
+                }`}
               >
                 {/* Team Info */}
-                <h2 className="text-2xl font-semibold mb-2">
-                  {team.team_name}
-                </h2>
+                <h2 className="text-2xl font-semibold mb-2">{team.team_name}</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   <p>
                     <span className="text-gray-400">ELO:</span>{" "}
-                    <span className="font-bold">
-                      {team.elo_rating.toFixed(2)}
-                    </span>
+                    <span className="font-bold">{team.elo_rating.toFixed(2)}</span>
                   </p>
                   <p>
                     <span className="text-gray-400">Win Rate:</span>{" "}
-                    <span className="font-bold">
-                      {(team.win_rate * 100).toFixed(1)}%
-                    </span>
+                    <span className="font-bold">{(team.win_rate * 100).toFixed(1)}%</span>
                   </p>
                   <p>
                     <span className="text-gray-400">Weighted:</span>{" "}
-                    <span className="font-bold">
-                      {team.weighted_score.toFixed(2)}
-                    </span>
+                    <span className="font-bold">{team.weighted_score.toFixed(2)}</span>
                   </p>
                   <p className="col-span-2 md:col-span-3">
                     <span className="text-gray-400">Preferred Futsals:</span>{" "}
-                    {team.preferred_futsals.length > 0
-                      ? team.preferred_futsals.join(", ")
-                      : "N/A"}
+                    {team.preferred_futsals?.length ? team.preferred_futsals.join(", ") : "N/A"}
                   </p>
                 </div>
 
-                {/* Similarity score bar */}
+                {/* Similarity Score Bar */}
                 <div className="mt-4">
                   <p className="text-gray-400 text-sm">Similarity Score</p>
                   <div className="w-full bg-gray-800 rounded-full h-3 mt-1">
                     <div
                       className="bg-green-600 h-3 rounded-full"
-                      style={{
-                        width: `${(team.similarity_score * 100).toFixed(0)}%`,
-                      }}
+                      style={{ width: `${(team.similarity_score * 100).toFixed(0)}%` }}
                     />
                   </div>
                   <p className="text-xs mt-1 text-gray-400">
@@ -166,15 +206,20 @@ export default function RecommendOpponent() {
                   </p>
                 </div>
 
-                {/* Invitation Button (only for first team) */}
-                {index === 0 && (
+                {/* Status / Invitation Button */}
+                {index === activeIndex && (
                   <button
-                    onClick={() =>
-                      handleSendInvitation(team.team_id, team.team_name)
-                    }
-                    className="mt-6 w-full bg-blue-600 hover:bg-blue-700 transition-all duration-300 text-lg font-bold py-3 rounded-xl shadow-lg"
+                    onClick={() => handleSendInvitation(team)}
+                    disabled={team.status !== "✅ Available"}
+                    className={`mt-6 w-full text-lg font-bold py-3 rounded-xl shadow-lg transition-all duration-300 ${
+                      team.status !== "✅ Available"
+                        ? "bg-gray-600 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
                   >
-                    📩 Send Match Invitation
+                    {team.status === "✅ Available"
+                      ? "📩 Send Match Invitation"
+                      : team.status}
                   </button>
                 )}
               </div>
