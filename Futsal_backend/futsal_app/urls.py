@@ -24,10 +24,10 @@ from .views import (
     GenerateTimeSlotsView,
 
     # Payment
-    esewa_success_callback,
-    esewa_failure_callback,
-    SendPaymentEmailView, 
-    ConfirmPaymentView,
+
+    InitiateEsewaPaymentView,
+    esewa_verify  ,
+    
 
 
     # Competitive
@@ -68,11 +68,10 @@ urlpatterns = [
     path('team-matches/<int:match_id>/reject/', RejectMatchView.as_view(), name='reject-match'),
     
 
-
-    path("api/payments/callback/success/", esewa_success_callback),
-    path("api/payments/callback/failure/", esewa_failure_callback),
-    path('team-matches/<int:match_id>/send-payment-email/', SendPaymentEmailView.as_view(), name='send_payment_email'),
-    path('team-matches/<int:match_id>/confirm-payment/', ConfirmPaymentView.as_view(), name='confirm_payment'),
+    # ----- Payment -----
+    path("payments/initiate/<int:match_id>/", InitiateEsewaPaymentView.as_view(), name="initiate-esewa-payment"),
+    path('payments/verify/', esewa_verify, name='esewa-verify'),
+   
     path('team-matches/<int:match_id>/update-result/', UpdateMatchResultView.as_view(), name='set-match-result'),
 
 
@@ -86,7 +85,7 @@ urlpatterns = [
     path('competitive/leaderboard/', views.competitive_leaderboard),
 
 
-   path('contact/', contact_message, name='contact-message'),
+    path('contact/', contact_message, name='contact-message'),
    
 
 ]
