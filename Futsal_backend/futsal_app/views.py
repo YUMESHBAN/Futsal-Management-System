@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
+import uuid, hmac, hashlib, base64, time
 
 
 
@@ -24,8 +25,14 @@ from utils.email_service import (
     notify_sender_on_booking_confirmed,
     notify_sender_on_match_rejected,
     notify_team_owners_match_result,
-    send_match_payment_email,
-    send_match_invitation_email 
+    send_match_invitation_email,
+
+    notify_sender_on_match_acceptance,
+    notify_sender_on_match_rejection,
+    notify_receiver_of_match_request,
+    notify_futsal_owner_on_competitive_booking,
+    notify_teams_on_game_completion,
+
 )
 
 
@@ -240,6 +247,8 @@ class OtherTeamsListView(ListAPIView):
     
 
 
+
+
 # -------------------------------
 # Team Match Views
 # -------------------------------
@@ -269,38 +278,154 @@ class TeamMatchListCreateView(generics.ListCreateAPIView):
         
         if team_1.owner != self.request.user:
             raise PermissionDenied("You can only send invites from your own team.")
-
+        
         # Save match first (without committing to DB yet)
         match = serializer.save()
 
-        # Handle slot booking if time_slot_id is provided
-        time_slot_id = self.request.data.get("time_slot_id")
-        if time_slot_id:
-            try:
-                slot = TimeSlot.objects.get(id=time_slot_id, is_booked=False)
-                slot.is_booked = True
-                slot.booked_by_match = match
-                slot.save()
-            except TimeSlot.DoesNotExist:
-                raise ValidationError("Invalid or already booked time slot.")
+        # Remove booking logic here - do not book futsal slot during match creation
 
 
+# -------------------------------
+# Payment Views
+# -------------------------------
+
+# -------------------------------
+# Match Acceptance + Payment Flow
+# -------------------------------
+
+ESWEA_SECRET_KEY = "EPAYTEST"  # Sandbox key
+ESEWA_PRODUCT_CODE = "EPAYTEST" 
+ESEWA_PAYMENT_URL = "https://rc-epay.esewa.com.np/api/epay/main/v2/form"  # Sandbox
+ESEWA_VERIFY_URL = "https://rc.esewa.com.np/api/epay/transaction/status/"  # Sandbox
+# -------------------------------
+# Payment Views
+# -------------------------------
+
+# Match Acceptance + Payment Flow
+
+class InitiateEsewaPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, match_id):
+        match = get_object_or_404(TeamMatch, id=match_id)
+
+        # Only invited team can accept
+        if match.team_2.owner != request.user:
+            return Response({"detail": "Not authorized to accept this match."}, status=403)
+
+        # Ensure match has a futsal
+        futsal = match.time_slot.futsal if match.time_slot else None
+        if not futsal:
+            return Response({"detail": "No futsal assigned to this match."}, status=400)
+
+        amount = "{:.2f}".format(futsal.price_per_hour)
+        tax = 0
+        total_amount = "{:.2f}".format(float(amount) + tax)
+
+        # Unique transaction ID
+        transaction_uuid = f"{match.id}_{int(time.time())}"
+
+        # Create/update payment record
+        payment, _ = Payment.objects.update_or_create(
+            match=match,
+            defaults={
+                "amount": amount,
+                "method": "eSewa",
+                "status": "pending",
+                "transaction_id": transaction_uuid,
+            },
+        )
+
+        # Fields to sign
+        fields_to_sign = {
+            "total_amount": amount,
+            "transaction_uuid": transaction_uuid,
+            "product_code": "EPAYTEST",
+        }
+
+        # HMAC SHA-256 signature
+        secret_key = getattr(settings, "ESEWA_SECRET_KEY", "EPAYTESTSECRET").encode()
+        signature_string = ",".join([f"{k}={v}" for k, v in fields_to_sign.items()])
+        signature = hmac.new(secret_key, signature_string.encode(), hashlib.sha256).digest()
+        signature_b64 = base64.b64encode(signature).decode()
+
+        payment_data = {
+            "amount": amount,
+            "tax_amount": tax,
+            "total_amount": total_amount,
+            "transaction_uuid": transaction_uuid,
+            "product_code": "EPAYTEST",
+            "product_service_charge": 0,
+            "product_delivery_charge": 0,
+            "success_url": "http://localhost:5173/payment-success",
+            "failure_url": "http://localhost:5173/payment-failure",
+            "signed_field_names": "total_amount,transaction_uuid,product_code",
+            "signature": signature_b64,
+        }
+
+        return Response({
+            "payment_url": "https://rc-epay.esewa.com.np/api/epay/main/v2/form",
+            "payment_data": payment_data
+        })
+
+@api_view(['POST'])
+def esewa_verify(request):
+    transaction_uuid = request.data.get("transaction_uuid")
+    
+    if not transaction_uuid:
+        return Response({"detail": "Missing transaction_uuid"}, status=400)
+
+    # Retrieve the payment object using the transaction ID (UUID)
+    payment = Payment.objects.filter(transaction_id=transaction_uuid).first()
+
+    if not payment:
+        return Response({"detail": "Invalid transaction UUID"}, status=400)
+
+    # Verify the payment via eSewa's API
+    payload = {
+        "amt": str(payment.amount),
+        "scd": "EPAYTEST",  
+        "pid": payment.transaction_id,
+    }
+
+    resp = requests.post("https://rc.esewa.com.np/api/epay/transaction/status/", data=payload)
+
+    if resp.status_code == 200:
+        if "SUCCESS" in resp.text:
+            payment.status = "paid"
+            payment.save()
+            # Update the match acceptance status here if needed
+            match = payment.match
+            match.accepted = True
+            match.save()
+            return Response({"detail": "Payment verified and match accepted."})
+        else:
+            return Response({"detail": "Payment verification failed."}, status=400)
+    else:
+        return Response({"detail": "Payment verification request failed."}, status=500)
+
+# -------------------------------
+# Accept Match (for other cases)
+# -------------------------------
 class AcceptMatchView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, match_id):
         match = get_object_or_404(TeamMatch, id=match_id)
 
         if match.team_2.owner != request.user:
-            return Response({"detail": "Not authorized to respond to this match."}, status=403)
+            raise PermissionDenied("You are not authorized to accept this match.")
 
+        # Directly accept the match
         match.accepted = True
         match.save()
         if match.match_type == "friendly":
             notify_futsal_owner_on_booking(match)
             notify_sender_on_booking_confirmed(match)
+            notify_accepter_on_payment_confirmed(match)
+        
 
-        return Response({"detail": "Match accepted."})
+        return Response({"detail": "Match accepted successfully."})
 
 
 class RejectMatchView(APIView):
@@ -338,12 +463,8 @@ class UpdateMatchResultView(APIView):
         try:
             team_1_score = int(request.data.get("team_1_score"))
             team_2_score = int(request.data.get("team_2_score"))
-            payment_method = request.data.get("payment_method")
         except (TypeError, ValueError):
-            return Response({"detail": "Invalid scores or missing payment method."}, status=400)
-
-        if payment_method not in ['Cash', 'eSewa']:
-            return Response({"detail": "Invalid payment method."}, status=400)
+            return Response({"detail": "Invalid scores."}, status=400)
 
         # Compute match result
         if team_1_score > team_2_score:
@@ -353,19 +474,6 @@ class UpdateMatchResultView(APIView):
         else:
             result = "Draw"
 
-        # Fetch or create payment
-        payment, _ = Payment.objects.get_or_create(
-            match=match,
-            defaults={
-                "amount": match.time_slot.futsal.price_per_hour,
-                "method": payment_method,
-                "status": "pending" if payment_method == "eSewa" else "paid"
-            }
-        )
-
-        if payment_method == "eSewa" and payment.status != "paid":
-            return Response({"detail": "eSewa payment not confirmed yet."}, status=400)
-
         # Save result
         match.team_1_score = team_1_score
         match.team_2_score = team_2_score
@@ -373,14 +481,9 @@ class UpdateMatchResultView(APIView):
         match.result_updated = True
         match.save()
 
-        # Ensure payment is updated
-        payment.method = payment_method
-        payment.status = "paid"
-        payment.save()
-
         notify_team_owners_match_result(match)
 
-        return Response({"detail": "Result and payment recorded successfully."})
+        return Response({"detail": "Result recorded successfully."})
 
 
 # -------------------------------
@@ -418,152 +521,6 @@ class PlayerListCreateView(generics.ListCreateAPIView):
             raise ValidationError({"detail": "Maximum of 8 players allowed."})
         serializer.save(team=team)
 
-
-
-# -------------------------------
-# Payment Views
-# -------------------------------
-
-@api_view(['POST'])
-@csrf_exempt
-def esewa_success_callback(request):
-    pid = request.POST.get('pid')
-    try:
-        payment = Payment.objects.get(transaction_id=pid)
-        payment.status = 'paid'
-        payment.save()
-        return HttpResponse("Payment Successful")
-    except Payment.DoesNotExist:
-        return HttpResponse("Payment not found", status=404)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def send_payment_email(request, match_id):
-    match = get_object_or_404(TeamMatch, id=match_id)
-    user = request.user
-
-    if not match.time_slot or match.time_slot.futsal.owner != user:
-        return Response({"detail": "Only the venue owner can send payment emails."}, status=403)
-
-    payment = getattr(match, 'payment', None)
-    if not payment or payment.method != 'eSewa' or payment.status != 'pending':
-        return Response({"detail": "No pending eSewa payment found for this match."}, status=400)
-
-    # Collect emails of players from both teams (assumes teams have owners with emails)
-    to_emails = []
-    if match.team_1.owner.email:
-        to_emails.append(match.team_1.owner.email)
-    if match.team_2.owner.email:
-        to_emails.append(match.team_2.owner.email)
-
-    if not to_emails:
-        return Response({"detail": "No players found to send payment email."}, status=400)
-
-    # Call your email helper (you will create this)
-    send_match_payment_email(to_emails, match, payment)
-
-    return Response({"detail": "Payment email sent to players."})
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def confirm_payment_received(request, match_id):
-    match = get_object_or_404(TeamMatch, id=match_id)
-    user = request.user
-
-    if not match.time_slot or match.time_slot.futsal.owner != user:
-        return Response({"detail": "Only the venue owner can confirm payment."}, status=403)
-
-    payment = getattr(match, 'payment', None)
-    if not payment or payment.status != 'pending':
-        return Response({"detail": "No pending payment to confirm."}, status=400)
-
-    # Mark payment as paid
-    payment.status = 'paid'
-    payment.save()
-
-    # Update match result now
-    match.result_updated = True
-    match.save()
-
-    # (Optional) send notification emails here
-
-    return Response({"detail": "Payment confirmed and match result updated."})
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-
-@api_view(['GET', 'POST'])
-def esewa_failure_callback(request):
-    # Handle eSewa failure callback logic here
-    return Response({"detail": "Payment failed or cancelled."})
-
-
-class SendPaymentEmailView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, match_id):
-        match = get_object_or_404(TeamMatch, id=match_id)
-
-        # Only futsal owner can send payment email
-        if not match.time_slot or match.time_slot.futsal.owner != request.user:
-            return Response({"detail": "Only the venue owner can send payment email."}, status=403)
-
-        # Compose eSewa payment URL (you can customize this as needed)
-        payment_url = f"https://rc-epay.esewa.com.np/api/epay/main/v2/form?pid=HAMRO-{match_id}&amt={match.time_slot.futsal.price_per_hour}&scd=EPAYTEST&su=http://your-success-url&fu=http://your-failure-url"
-
-        # Prepare list of player emails - assuming both teams' owners are paying players
-        to_emails = []
-        if match.team_1.owner.email:
-            to_emails.append(match.team_1.owner.email)
-        if match.team_2.owner.email:
-            to_emails.append(match.team_2.owner.email)
-
-        # Custom message with payment URL
-        subject = f'HamroFutsal - Payment Request for Match {match.team_1.name} vs {match.team_2.name}'
-        message = (
-            f"Dear Player,\n\n"
-            f"You have a payment request for your upcoming match:\n"
-            f"Teams: {match.team_1.name} vs {match.team_2.name}\n"
-            f"Scheduled Time: {match.scheduled_time}\n"
-            f"Venue: {match.time_slot.futsal.name}\n\n"
-            f"Please complete your payment via eSewa here:\n{payment_url}\n\n"
-            f"Thank you,\nHamroFutsal Team"
-        )
-
-        send_match_payment_email(to_emails, match)  # or send_mail(subject, message, ...) if you want to send this message
-
-        return Response({"detail": "Payment email sent to players."})
-    
-
-class ConfirmPaymentView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, match_id):
-        match = get_object_or_404(TeamMatch, id=match_id)
-
-        # Only futsal owner can confirm payment
-        if not match.time_slot or match.time_slot.futsal.owner != request.user:
-            return Response({"detail": "Only the venue owner can confirm payment."}, status=403)
-
-        # Create or update the payment record
-        payment, created = Payment.objects.get_or_create(
-            match=match,
-            defaults={
-                "amount": match.time_slot.futsal.price_per_hour,
-                "method": "eSewa",
-                "status": "paid",
-            },
-        )
-
-        if not created and payment.status == "paid":
-            return Response({"detail": "Payment is already marked as paid."})
-
-        # Mark payment as paid
-        payment.status = "paid"
-        payment.save()
-
-        return Response({"detail": "Payment marked as received."})
-    
 
 
 
@@ -723,6 +680,8 @@ def send_match_request(request, team_id):
         accepted=None
     )
 
+    notify_receiver_of_match_request(match)
+
     return Response({"message": "Match request sent.", "match_id": match.id}, status=201)
 
 
@@ -747,6 +706,7 @@ def respond_to_match_request(request, match_id):
         match.status = 'confirmed'
         match.accepted = True
         match.save()
+        
         return Response({"message": "Match accepted successfully."})
 
     # ❌ Handle rejection
@@ -770,6 +730,8 @@ def respond_to_match_request(request, match_id):
 
     # Get alternative recommended teams excluding rejected
     alternatives = get_alternative_teams(match.team_1, exclude_team=match.team_2.id)
+
+    notify_sender_on_match_rejection(match, alternatives)
 
     return Response({
         "message": "Match request rejected.",
@@ -932,6 +894,8 @@ def schedule_match(request, match_id):
     match.futsal = futsal
     match.status = 'scheduled'
     match.save()
+    notify_sender_on_match_acceptance(match)
+    notify_futsal_owner_on_competitive_booking(match)
 
     return Response({
         "message": "Match scheduled successfully.",
@@ -1020,6 +984,8 @@ def finalize_match(request):
         goals_a=goals_team_1,
         goals_b=goals_team_2
     )
+
+    notify_teams_on_game_completion(match)
 
     return Response({
         'message': 'Match finalized, goals saved, ELO updated, and previous rejections cleared.',
