@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Footer from "../../components/FooterIN";
 import Header from "../../components/header";
+import { useNavigate } from "react-router-dom";
 
 interface Match {
   id: number;
@@ -13,6 +14,13 @@ interface Match {
   scheduled_time: string;
   accepted: boolean | null;
   created_at: string;
+  time_slot: {
+    futsal: {
+      id: number;
+      name: string;
+      price_per_hour: string;
+    } | null;
+  } | null;
 }
 
 export default function MatchHistory() {
@@ -20,6 +28,7 @@ export default function MatchHistory() {
   const [myTeamId, setMyTeamId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();  // Added for navigation after payment success
 
   const token = localStorage.getItem("token");
 
@@ -29,13 +38,11 @@ export default function MatchHistory() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Get user's team
         const teamRes = await axios.get("http://127.0.0.1:8000/api/my-team/", {
           headers: { Authorization: `Token ${token}` },
         });
         setMyTeamId(teamRes.data.id);
 
-        // Get all matches
         const matchesRes = await axios.get(
           "http://127.0.0.1:8000/api/team-matches/",
           {
@@ -59,32 +66,53 @@ export default function MatchHistory() {
     action: "accept" | "reject"
   ) => {
     if (!token) return;
-    try {
-      const endpoint = `http://127.0.0.1:8000/api/team-matches/${matchId}/${action}/`;
-      await axios.post(
-        endpoint,
-        {},
-        { headers: { Authorization: `Token ${token}` } }
-      );
 
-      // Refresh matches
-      const res = await axios.get("http://127.0.0.1:8000/api/team-matches/", {
-        headers: { Authorization: `Token ${token}` },
-      });
-      setMatches(res.data);
+    try {
+      if (action === "accept") {
+        // Initiate eSewa payment
+        const paymentRes = await axios.post(
+          `http://127.0.0.1:8000/api/payments/initiate/${matchId}/`,
+          {},
+          { headers: { Authorization: `Token ${token}` } }
+        );
+
+        const { payment_url, payment_data } = paymentRes.data;
+
+        // Create hidden form and submit
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = payment_url;
+
+        Object.entries(payment_data).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = value as string;
+          form.appendChild(input);
+        });
+
+        // Redirect user to eSewa payment page
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        // Reject the match invitation
+        const endpoint = `http://127.0.0.1:8000/api/team-matches/${matchId}/reject/`;
+        await axios.post(endpoint, {}, { headers: { Authorization: `Token ${token}` } });
+
+        const res = await axios.get("http://127.0.0.1:8000/api/team-matches/", {
+          headers: { Authorization: `Token ${token}` },
+        });
+        setMatches(res.data);
+      }
     } catch (err) {
       console.error(`Failed to ${action} match:`, err);
       alert(`Failed to ${action} match invitation.`);
     }
   };
 
-  if (error)
-    return <div className="text-red-500 text-center mt-10">{error}</div>;
+  if (error) return <div className="text-red-500 text-center mt-10">{error}</div>;
+  if (loading || myTeamId === null) return <div className="text-center mt-10">Loading...</div>;
 
-  if (loading || myTeamId === null)
-    return <div className="text-center mt-10">Loading...</div>;
-
-  // Separate invites and completed matches
   const sentInvites = matches.filter(
     (m) => m.accepted === null && m.team_1 === myTeamId
   );
@@ -92,11 +120,10 @@ export default function MatchHistory() {
     (m) => m.accepted === null && m.team_2 === myTeamId
   );
   const matchHistory = matches
-    .filter((m) => m.accepted === true || m.accepted === false) // ✅ only accepted/rejected
+    .filter((m) => m.accepted !== null)
     .sort(
       (a, b) =>
-        new Date(b.scheduled_time).getTime() -
-        new Date(a.scheduled_time).getTime()
+        new Date(b.scheduled_time).getTime() - new Date(a.scheduled_time).getTime()
     );
 
   return (
@@ -133,6 +160,7 @@ export default function MatchHistory() {
             )}
           </section>
 
+          
           {/* Received Invites */}
           <section>
             <h2 className="text-xl font-semibold mb-3 text-gray-800">

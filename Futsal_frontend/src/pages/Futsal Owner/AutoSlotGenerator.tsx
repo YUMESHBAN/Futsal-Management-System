@@ -97,22 +97,17 @@ export default function AutoSlotGenerator() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Futsal Selection */}
-            <div>
-              <label className="block font-semibold text-gray-700 mb-2">
-                Select Your Futsal
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Your Futsal
               </label>
-              <select
-                value={selectedFutsalId || ""}
-                onChange={(e) => setSelectedFutsalId(Number(e.target.value))}
-                className="w-full border border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 p-3 rounded-lg"
-              >
-                {futsals.map((futsal) => (
-                  <option key={futsal.id} value={futsal.id}>
-                    {futsal.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {futsals.length === 0 ? (
+                <p className="text-gray-500">No futsal created yet</p>
+              ) : (
+                <p className="font-medium text-gray-700">{futsals[0].name}</p>
+              )}
+           </div>
+
 
             {/* Date */}
             <div>

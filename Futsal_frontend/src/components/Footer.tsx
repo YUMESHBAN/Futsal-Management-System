@@ -80,7 +80,7 @@ export default function Footer() {
         {/* Credits */}
         <p className="text-sm text-gray-200 text-center md:text-right w-full md:w-auto">
           © 2025 HAMROFUTSAL.KTM , NEPAL <br />
-          <span className="text-gray-400">
+          <span className="text-gray-300">
             Designed & Developed by{" "}
             <span className="font-bold">Sujal, Rupesh & Yumesh</span>
           </span>

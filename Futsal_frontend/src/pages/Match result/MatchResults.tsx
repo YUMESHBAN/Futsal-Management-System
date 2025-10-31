@@ -11,8 +11,6 @@ interface Match {
   result_updated: boolean;
 }
 
-type PaymentMethod = "Cash" | "eSewa";
-
 export default function MatchResults() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -21,35 +19,11 @@ export default function MatchResults() {
   const [message, setMessage] = useState("");
   const token = localStorage.getItem("token");
 
-  const [scores, setScores] = useState<
-    Record<
-      number,
-      {
-        team_1_score: number;
-        team_2_score: number;
-        payment_method: PaymentMethod;
-        payment_confirmed: boolean;
-      }
-    >
-  >({});
+  const [scores, setScores] = useState<Record<number, { team_1_score: number; team_2_score: number }>>({});
 
-  // Helper to safely update a match score entry (avoids spreading undefined)
-  const updateScoreEntry = (
-    matchId: number,
-    patch: Partial<{
-      team_1_score: number;
-      team_2_score: number;
-      payment_method: PaymentMethod;
-      payment_confirmed: boolean;
-    }>
-  ) => {
+  const updateScoreEntry = (matchId: number, patch: Partial<{ team_1_score: number; team_2_score: number }>) => {
     setScores((prev) => {
-      const prevEntry = prev[matchId] ?? {
-        team_1_score: 0,
-        team_2_score: 0,
-        payment_method: "Cash" as PaymentMethod,
-        payment_confirmed: false,
-      };
+      const prevEntry = prev[matchId] ?? { team_1_score: 0, team_2_score: 0 };
       return { ...prev, [matchId]: { ...prevEntry, ...patch } };
     });
   };
@@ -61,11 +35,7 @@ export default function MatchResults() {
 
   const fetchMatches = async () => {
     try {
-      if (!token) {
-        setMatches([]);
-        setLoading(false);
-        return;
-      }
+      if (!token) return setMatches([]);
       const res = await axios.get("http://127.0.0.1:8000/api/team-matches/", {
         headers: { Authorization: `Token ${token}` },
       });
@@ -79,14 +49,8 @@ export default function MatchResults() {
 
   const handleSubmit = async (matchId: number) => {
     const entry = scores[matchId];
-    // entry can be undefined if user didn't touch inputs — handle that
     if (!entry || entry.team_1_score == null || entry.team_2_score == null) {
       setMessage("⚠️ Both scores are required.");
-      return;
-    }
-
-    if (entry.payment_method === "eSewa" && !entry.payment_confirmed) {
-      setMessage("⚠️ Please confirm eSewa payment before submitting result.");
       return;
     }
 
@@ -99,7 +63,6 @@ export default function MatchResults() {
         {
           team_1_score: entry.team_1_score,
           team_2_score: entry.team_2_score,
-          payment_method: entry.payment_method,
         },
         { headers: { Authorization: `Token ${token}` } }
       );
@@ -114,44 +77,6 @@ export default function MatchResults() {
       });
     } catch (err: any) {
       setMessage(err?.response?.data?.detail || "❌ Failed to update result");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const sendEsewaEmail = async (matchId: number) => {
-    setSubmitting(true);
-    setMessage("");
-    try {
-      await axios.post(
-        `http://127.0.0.1:8000/api/team-matches/${matchId}/send-payment-email/`,
-        {},
-        { headers: { Authorization: `Token ${token}` } }
-      );
-      setMessage("📧 eSewa payment link sent!");
-    } catch (err: any) {
-      setMessage(err?.response?.data?.detail || "❌ Failed to send email");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const confirmPayment = async (matchId: number) => {
-    setSubmitting(true);
-    setMessage("");
-    try {
-      await axios.post(
-        `http://127.0.0.1:8000/api/team-matches/${matchId}/confirm-payment/`,
-        {},
-        { headers: { Authorization: `Token ${token}` } }
-      );
-      // ensure entry exists and mark confirmed
-      updateScoreEntry(matchId, { payment_confirmed: true });
-      setMessage("✅ Payment marked as received.");
-    } catch (err: any) {
-      setMessage(
-        err?.response?.data?.detail || "❌ Failed to confirm payment."
-      );
     } finally {
       setSubmitting(false);
     }
@@ -229,11 +154,7 @@ export default function MatchResults() {
                             type="number"
                             min={0}
                             disabled={submitting}
-                            value={
-                              entry?.team_1_score !== undefined
-                                ? entry.team_1_score
-                                : ""
-                            }
+                            value={entry?.team_1_score ?? ""}
                             onChange={(e) =>
                               updateScoreEntry(match.id, {
                                 team_1_score: Number(e.target.value) || 0,
@@ -252,11 +173,7 @@ export default function MatchResults() {
                             type="number"
                             min={0}
                             disabled={submitting}
-                            value={
-                              entry?.team_2_score !== undefined
-                                ? entry.team_2_score
-                                : ""
-                            }
+                            value={entry?.team_2_score ?? ""}
                             onChange={(e) =>
                               updateScoreEntry(match.id, {
                                 team_2_score: Number(e.target.value) || 0,
@@ -266,62 +183,9 @@ export default function MatchResults() {
                           />
                         </div>
 
-                        {/* Payment method */}
-                        <div>
-                          <label className="block mb-1 text-sm font-medium text-gray-700">
-                            Payment Method
-                          </label>
-                          <select
-                            disabled={submitting}
-                            value={entry?.payment_method ?? "Cash"}
-                            onChange={(e) =>
-                              updateScoreEntry(match.id, {
-                                payment_method: e.target.value as PaymentMethod,
-                                payment_confirmed: false,
-                              })
-                            }
-                            className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-400"
-                          >
-                            <option value="Cash">💵 HandCash</option>
-                            <option value="eSewa">📱 eSewa</option>
-                          </select>
-                        </div>
-
-                        {/* eSewa helpers */}
-                        {entry?.payment_method === "eSewa" && (
-                          <div className="space-y-2">
-                            {!entry.payment_confirmed ? (
-                              <div className="flex gap-2 flex-wrap">
-                                <button
-                                  disabled={submitting}
-                                  onClick={() => sendEsewaEmail(match.id)}
-                                  className="px-4 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600"
-                                >
-                                  📧 Send eSewa Link
-                                </button>
-                                <button
-                                  disabled={submitting}
-                                  onClick={() => confirmPayment(match.id)}
-                                  className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
-                                >
-                                  ✅ Mark Payment Received
-                                </button>
-                              </div>
-                            ) : (
-                              <p className="text-green-600 font-semibold">
-                                ✅ Payment Confirmed
-                              </p>
-                            )}
-                          </div>
-                        )}
-
                         {/* Submit */}
                         <button
-                          disabled={
-                            submitting ||
-                            (entry?.payment_method === "eSewa" &&
-                              !entry?.payment_confirmed)
-                          }
+                          disabled={submitting}
                           onClick={() => handleSubmit(match.id)}
                           className={`w-full py-2 rounded-md text-lg font-bold transition ${
                             submitting

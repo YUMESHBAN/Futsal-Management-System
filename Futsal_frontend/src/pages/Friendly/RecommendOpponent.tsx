@@ -95,7 +95,7 @@ export default function RecommendOpponent() {
       // Optionally navigate after short delay
       setTimeout(() => {
         navigate("/competitive-center");
-      }, 1000);
+      });
     } catch (error: any) {
       setInviteMessage(
         error.response?.data?.error ||
@@ -211,7 +211,7 @@ export default function RecommendOpponent() {
                   <button
                     onClick={() => handleSendInvitation(team)}
                     disabled={team.status !== "✅ Available"}
-                    className={`mt-6 w-full text-lg font-bold py-3 rounded-xl shadow-lg transition-all duration-300 ${
+                    className={`mt-6 w-full text-lg font-bold py-3 rounded-xl shadow-lg transition-all  ${
                       team.status !== "✅ Available"
                         ? "bg-gray-600 cursor-not-allowed"
                         : "bg-blue-600 hover:bg-blue-700"

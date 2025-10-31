@@ -8,6 +8,8 @@ export default function Header() {
   const [userType, setUserType] = useState("");
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hasFutsal, setHasFutsal] = useState(false);
+  const [hasTeam, setHasTeam] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,9 +23,44 @@ export default function Header() {
     } else {
       setUsername(user_name || "");
       setUserType(user_type || "");
+
+      if (user_type === "owner") {
+        fetchOwnerFutsal(token);
+      } else if (user_type === "player") {
+        fetchPlayerTeam(token); // ✅ check if player has a team
+      }
+
       setLoading(false);
     }
   }, [navigate]);
+
+  const fetchOwnerFutsal = async (token: string) => {
+    try {
+      const res = await fetch("http://localhost:8000/api/my-futsals/", {
+        headers: { Authorization: `Token ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch futsal");
+      const data = await res.json();
+      setHasFutsal(data && data.length > 0);
+    } catch (err) {
+      console.error(err);
+      setHasFutsal(false);
+    }
+  };
+
+  const fetchPlayerTeam = async (token: string) => {
+    try {
+      const res = await fetch("http://localhost:8000/api/my-team/", {
+        headers: { Authorization: `Token ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch team");
+      const data = await res.json();
+      setHasTeam(data && Object.keys(data).length > 0);
+    } catch (err) {
+      console.error(err);
+      setHasTeam(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -32,8 +69,9 @@ export default function Header() {
 
   const ownerOptions = [
     { label: "Dashboard", path: "/dashboard" },
-    { label: "Create Futsal", path: "/create-futsal" },
-    { label: "View My Futsals", path: "/my-futsal" },
+    hasFutsal
+      ? { label: "View My Futsals", path: "/my-futsal" }
+      : { label: "Create Futsal", path: "/create-futsal" },
     { label: "Generate Time Slots", path: "/generate-slots" },
     { label: "Manage Time Slots", path: "/manage-slots" },
     { label: "View All Time Slots", path: "/time-slots" },
@@ -43,9 +81,11 @@ export default function Header() {
 
   const playerOptions = [
     { label: "Dashboard", path: "/dashboard" },
+
+    hasTeam
+      ? { label: "View My Team", path: "/my-team" } // ✅ already has team
+      : { label: "Create My Team", path: "/create-team" }, // ✅ no team yet
     { label: "View All Futsals", path: "/all-futsals" },
-    { label: "Create My Team", path: "/create-team" },
-    { label: "View My Team", path: "/my-team" },
     { label: "Invite Team for Match", path: "/invite-team" },
     { label: "View My Matches", path: "/matches" },
     { label: "View My Team Rating", path: "/my-competitive-status" },
@@ -102,12 +142,12 @@ export default function Header() {
               onClick={() => setMenuOpen(!menuOpen)}
               className="bg-white text-green-700 px-4 py-2 rounded-lg font-medium hover:bg-green-50 transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-green-300"
             >
-              {currentPage} {/* ⬅ shows Dashboard or current page */}
+              {currentPage}
               <ChevronDown className="ml-2 h-4 w-4" />
             </button>
 
             {menuOpen && (
-              <div className="absolute left-0  mt-2 w-52 bg-white rounded-lg shadow-lg text-gray-700 z-50 border border-gray-200 overflow-hidden mt-7">
+              <div className="absolute left-0 mt-2 w-52 bg-white rounded-lg shadow-lg text-gray-700 z-50 border border-gray-200 overflow-hidden mt-7">
                 {menuItems.map((item, idx) => (
                   <button
                     key={idx}

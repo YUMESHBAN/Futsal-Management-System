@@ -145,50 +145,14 @@ export default function ManageSlots() {
       <Header />
       <div className=" bg-gradient-to-br from-green-50 to-green-100 p-5">
         <div className="max-w-3xl mx-auto mt-10">
-          <h2 className="text-2xl font-bold mb-6">Manage Time Slots</h2>
+          <h2 className="text-2xl font-bold mb-6">Manage Existing Time Slots</h2>
 
-          {/* Create Form */}
+          
 
-          <div className="bg-white p-4 rounded shadow mb-6">
-            <h3 className="text-xl font-semibold mb-2">Create New Slot</h3>
-            <div className="flex flex-col md:flex-row gap-2 mb-2">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="border p-2 w-full rounded"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  End Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="border p-2 w-full rounded"
-                />
-              </div>
-            </div>
-            <button
-              onClick={createSlot}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-            >
-              Create
-            </button>
-            {error && <p className="text-red-500 mt-2">{error}</p>}
-            {message && <p className="text-green-600 mt-2">{message}</p>}
-          </div>
-
+          
           {/* Time Slot List */}
           <div>
-            <h3 className="text-xl font-semibold mb-2">Existing Slots</h3>
-
+            
             {Object.keys(groupedSlots).length === 0 ? (
               <p className="text-gray-500">No time slots available</p>
             ) : (
